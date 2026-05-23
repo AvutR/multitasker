@@ -7,6 +7,7 @@ import { EventBus } from './events'
 import { WorktreeManager } from './git/Worktrees'
 import { ActionService, seedDefaultPolicies } from './integrations/ActionService'
 import { SdkConnectorGateway } from './integrations/ConnectorGateway'
+import { LifecycleAutomation } from './orchestrator/LifecycleAutomation'
 import { SessionManager } from './orchestrator/SessionManager'
 import { registerIpcHandlers, type AppContext } from './ipc/handlers'
 
@@ -86,7 +87,8 @@ function bootstrap(): void {
   const bus = new EventBus()
   const worktrees = new WorktreeManager(join(app.getPath('userData'), 'worktrees'))
   const actions = new ActionService(repos, bus, new SdkConnectorGateway())
-  const sessions = new SessionManager(repos, bus, actions, worktrees)
+  const automation = new LifecycleAutomation(bus, actions)
+  const sessions = new SessionManager(repos, bus, actions, worktrees, automation)
   sessions.reconcileOnStartup()
 
   const ctx: AppContext = { repos, bus, sessions, actions, worktrees }

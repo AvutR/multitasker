@@ -154,11 +154,18 @@ export interface LaunchPreset {
 export interface SpawnRequest {
   prompt: string
   cwd: string
+  /** Preset id, or 'auto' / omitted to route by task intent (no slash command). */
   presetId?: string
   model?: string
   permissionMode?: PermissionMode
   useWorktree?: boolean
   title?: string
+  // Optional work-item links for automatic lifecycle updates on other apps.
+  linearIssueId?: string
+  notionPageId?: string
+  slackChannel?: string
+  /** Default true — auto-post lifecycle updates (policy still applies). */
+  autoUpdates?: boolean
 }
 
 export interface AppSettings {
