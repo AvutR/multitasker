@@ -9,7 +9,7 @@ Built for the Unbound velocity bar (see *Raising the Bar*): one place to drive 1
 ## What it does
 
 - **Parallel agents.** Each session is its own Claude Code subprocess (`@anthropic-ai/claude-agent-sdk` `query()`), spawned with its own working directory / git worktree. A concurrency cap queues the rest. Spawn, **steer** (inject messages mid-run), stop, resume, fork.
-- **Skills by default.** Every session loads your installed skills/agents/commands (`settingSources: ['user','project','local']`) and is system-prompted to prefer them — `/build`, `/council`, `/security-review`, the `principal-*` agents.
+- **Skills by default.** Every session loads your installed skills/agents/commands (`settingSources: ['user','project','local']`) and is system-prompted to prefer them — `/build`, `/council`, `/security-review`, the `principal-*` agents. The team pipeline from [websentry-ai/skills](https://github.com/websentry-ai/skills) (`/build`, `/council`, and the `principal-*` / `elite-pr-reviewer` / `code-simplifier` / evaluator agents) is **vendored into [`.claude/`](.claude)**, so anyone who opens this repo in Claude Code gets it with zero setup and agents Multitasker spawns load it by default.
 - **Editor / review layer.** A Monaco-based file tree + editor (the "Copilot feel"), a side-by-side **diff review**, a live streaming transcript per agent, and an **inline plan-approval gate**.
 - **Policy-gated integrations.** A typed taxonomy of every external action (`linear.status_update`, `slack.standup_post`, `notion.spec_update`, …), each independently set to **AUTO / one-click APPROVE / OFF**, plus a **global dry-run** master switch. Internal bookkeeping (Linear/Notion) defaults AUTO; outward posts (Slack) default APPROVE. Every action is written to an append-only **audit log**.
 - **Local-commit landing.** No remote / no PR in this build — the in-app "Commit" lands a verified local commit on the session's worktree branch.
@@ -78,6 +78,7 @@ Two enforcement paths guarantee **nothing outward escapes the policy**: agents a
 ## Layout
 
 ```
+.claude/         vendored team skills: /build, /council + principal-* / reviewer / evaluator agents
 src/main/        Electron main = orchestrator (db, orchestrator, integrations, git, fs, skills, ipc)
 src/preload/     contextBridge → window.api
 src/renderer/    React + Monaco UI (store, components)
