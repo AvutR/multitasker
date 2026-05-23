@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+.vite/
+*.log
+.DS_Store
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
