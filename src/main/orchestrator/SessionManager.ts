@@ -5,7 +5,9 @@ import type { EventBus } from '../events'
 import type { ActionService } from '../integrations/ActionService'
 import type { WorktreeManager } from '../git/Worktrees'
 import { DEFAULT_PRESET_ID, getPreset, launchOptionsFor } from '../skills/launchPresets'
+import { resolvePresetId } from '../skills/taskRouter'
 import { AgentSession, type SessionDeps } from './AgentSession'
+import type { LifecycleAutomation } from './LifecycleAutomation'
 
 interface PendingSpawn {
   session: AgentSession
@@ -30,7 +32,8 @@ export class SessionManager {
     private readonly repos: Repositories,
     private readonly bus: EventBus,
     actions: ActionService,
-    private readonly worktrees: WorktreeManager
+    private readonly worktrees: WorktreeManager,
+    private readonly automation: LifecycleAutomation
   ) {
     this.deps = { repos, bus, actions }
   }
@@ -53,7 +56,8 @@ export class SessionManager {
   }
 
   async spawn(req: SpawnRequest): Promise<SessionInfo> {
-    const preset = getPreset(req.presetId) ?? getPreset(DEFAULT_PRESET_ID)!
+    // 'auto' / omitted routes to the right skill by task intent — no slash command.
+    const preset = getPreset(resolvePresetId(req.presetId, req.prompt)) ?? getPreset(DEFAULT_PRESET_ID)!
     const settings = this.repos.settings.get()
     const id = randomUUID()
     const useWorktree = req.useWorktree ?? preset.useWorktree
@@ -104,6 +108,12 @@ export class SessionManager {
       isBuildPipeline: Boolean(preset.isBuildPipeline)
     })
     this.sessions.set(id, session)
+    this.automation.register(id, {
+      linearIssueId: req.linearIssueId ?? null,
+      notionPageId: req.notionPageId ?? null,
+      slackChannel: req.slackChannel ?? null,
+      autoUpdates: req.autoUpdates ?? true
+    })
     this.enqueue({ session, prompt: req.prompt, kind: 'start' })
     return session.snapshot()
   }

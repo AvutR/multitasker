@@ -26,6 +26,7 @@ import { EventBus } from '../../src/main/events'
 import { ActionService, seedDefaultPolicies } from '../../src/main/integrations/ActionService'
 import { AgentSession } from '../../src/main/orchestrator/AgentSession'
 import { SessionManager } from '../../src/main/orchestrator/SessionManager'
+import { LifecycleAutomation } from '../../src/main/orchestrator/LifecycleAutomation'
 import { WorktreeManager } from '../../src/main/git/Worktrees'
 
 function deps() {
@@ -181,7 +182,7 @@ describe('SessionManager concurrency cap', () => {
         })
       })()
 
-    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'))
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
     const a = await manager.spawn({ prompt: 'A', cwd: '/tmp/x', presetId: 'explore' })
     const b = await manager.spawn({ prompt: 'B', cwd: '/tmp/x', presetId: 'explore' })
 
@@ -213,7 +214,7 @@ describe('SessionManager concurrency cap', () => {
           else signal.addEventListener('abort', () => resolve(), { once: true })
         })
       })()
-    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'))
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
     const a = await manager.spawn({ prompt: 'A', cwd: '/tmp', presetId: 'build', useWorktree: false })
     const b = await manager.spawn({ prompt: 'B', cwd: '/tmp', presetId: 'explore' })
 
