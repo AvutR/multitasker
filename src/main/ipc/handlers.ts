@@ -9,7 +9,7 @@ import type { SessionManager } from '../orchestrator/SessionManager'
 import type { WorktreeManager } from '../git/Worktrees'
 import { commitAll, computeDiff, readRepoMeta, undoLastCommit } from '../git/Worktrees'
 import { listDir, readFileScoped } from '../fs/fsAccess'
-import { getPreset, LAUNCH_PRESETS } from '../skills/launchPresets'
+import { getPreset, loadWorkflows } from '../skills/launchPresets'
 import { listModels } from '../models'
 
 export interface AppContext {
@@ -81,7 +81,7 @@ export function registerIpcHandlers(ctx: AppContext): void {
   handle('models:list', () => listModels(ctx.repos.settings.get()))
 
   // Presets / settings / repos
-  handle('presets:list', () => LAUNCH_PRESETS)
+  handle('presets:list', () => loadWorkflows())
   handle('settings:get', () => ctx.repos.settings.get())
   handle('settings:set', (patch) => ctx.repos.settings.set(patch))
   handle('repos:add', async (path) => {

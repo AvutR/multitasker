@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "A UI editor layer atop Claude Code to maximize multitasking — run, steer, and review many parallel agent sessions, with skills-by-default and a policy-gated Slack/Notion/Linear/GitHub automation engine.",
-  "author": "Unbound",
+  "author": "AvutR",
+  "homepage": "https://github.com/AvutR/multitasker",
+  "repository": { "type": "git", "url": "https://github.com/AvutR/multitasker.git" },
   "license": "MIT",
   "main": "out/main/index.js",
   "scripts": {
@@ -22,7 +24,7 @@
     "dist": "electron-vite build && electron-rebuild -f -o better-sqlite3 && electron-builder"
   },
   "build": {
-    "appId": "ai.unbound.multitasker",
+    "appId": "io.github.avutr.multitasker",
     "productName": "Multitasker",
     "directories": { "output": "release" },
     "files": ["out/**/*", "package.json"],

@@ -8,9 +8,9 @@ describe('taskRouter — automatic skill selection (no slash command)', () => {
     expect(routePreset('refactor the auth module')).toBe('build')
   })
 
-  it('routes standup and Linear ops to their presets', () => {
+  it('routes standup and issue-tracker ops to their presets', () => {
     expect(routePreset('post my standup for the gateway project')).toBe('standup')
-    expect(routePreset('update Linear statuses for this cycle')).toBe('linear-sync')
+    expect(routePreset('update Linear statuses for this cycle')).toBe('tracker-sync')
   })
 
   it('falls back to explore for open-ended tasks', () => {
