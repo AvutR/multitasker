@@ -280,6 +280,8 @@ export class SettingsRepo {
 
   set(patch: Partial<AppSettings>): AppSettings {
     const next = { ...this.get(), ...patch }
+    // Clamp the cap regardless of caller — a runaway value would spawn that many subprocesses.
+    next.concurrencyCap = Math.min(32, Math.max(1, Math.floor(next.concurrencyCap)))
     this.db
       .prepare(
         `INSERT INTO settings (key, value_json) VALUES ('app', ?)
