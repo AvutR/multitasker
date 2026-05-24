@@ -28,9 +28,15 @@ Other scripts:
 
 ```bash
 npm run typecheck    # tsc --noEmit
-npm test             # vitest (orchestration + policy engine, 35 tests)
+npm test             # vitest (orchestration + policy engine, 44 tests)
 npm run build        # production bundle (electron-vite build)
 ```
+
+### Native module note (better-sqlite3)
+
+`better-sqlite3` is a native addon, so it must match the runtime's ABI — Electron and Node use different ones. This is handled automatically: `predev` rebuilds it for Electron before `npm run dev`, and `pretest` rebuilds it for Node before `npm test` (only when needed, so it's a no-op otherwise). To flip manually: `npm run rebuild:electron` / `npm run rebuild:node`.
+
+Electron is pinned to **30.x** because `better-sqlite3@12.10.0` (latest) doesn't yet compile against Electron 42's V8. Bump Electron once `better-sqlite3` supports a newer V8, or swap to `node:sqlite` when it's unflagged in Electron's bundled Node.
 
 In the app: **+ New** → pick a preset, point it at a repo path, give it a task. Watch it stream, review the diff, approve its plan, and one-click-approve any outward integration actions in the right-hand drawer.
 
