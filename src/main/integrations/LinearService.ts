@@ -1,4 +1,5 @@
 import type { LinearIssue } from '@shared/types'
+import { claudeExecutablePath } from '../sdkRuntime'
 
 /** Returns the raw text the Linear-reading agent produced. Injected for tests. */
 export interface LinearReader {
@@ -30,6 +31,7 @@ export class SdkLinearReader implements LinearReader {
         settingSources: ['user', 'project', 'local'],
         permissionMode: 'default',
         maxTurns: 8,
+        pathToClaudeCodeExecutable: claudeExecutablePath(),
         canUseTool: async (toolName: string, toolInput: Record<string, unknown>) => {
           // Read-only Linear access only.
           if (toolName.toLowerCase().includes('linear')) return { behavior: 'allow', updatedInput: toolInput }

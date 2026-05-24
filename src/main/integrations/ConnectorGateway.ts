@@ -1,4 +1,5 @@
 import type { Connector } from '@shared/types'
+import { claudeExecutablePath } from '../sdkRuntime'
 
 export interface ConnectorExecuteInput {
   actionType: string
@@ -35,6 +36,7 @@ export class SdkConnectorGateway implements ConnectorGateway {
         prompt: buildPrompt(input),
         options: {
           settingSources: ['user', 'project', 'local'],
+          pathToClaudeCodeExecutable: claudeExecutablePath(),
           // NOT bypassPermissions: this worker is scoped to ONLY the target
           // connector's tools. canUseTool denies Bash, Edit, and every other
           // connector, so a malicious/injected payload can't escalate beyond

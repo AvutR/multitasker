@@ -6,6 +6,7 @@ import type { ActionService } from '../integrations/ActionService'
 import { createConnectorGate, type GateDecision } from '../integrations/guards'
 import { createIntegrationMcpServer } from '../integrations/integrationMcpServer'
 import { resolveModel } from '../models'
+import { claudeExecutablePath } from '../sdkRuntime'
 import { AsyncQueue } from '../util/AsyncQueue'
 import { assistantBlocks, extractDelta, isExitPlanTool, userBlocks } from './sdkMapping'
 
@@ -130,6 +131,9 @@ export class AgentSession {
       },
       canUseTool: this.canUseTool
     }
+    // Use the installed claude binary (the SDK can't spawn its bundled CLI from inside an asar).
+    const claudePath = claudeExecutablePath()
+    if (claudePath) options.pathToClaudeCodeExecutable = claudePath
     // Resolve the selected model to its SDK model string + any provider env.
     const { sdkModel, env } = resolveModel(this.info.model, this.deps.repos.settings.get())
     options.model = sdkModel
