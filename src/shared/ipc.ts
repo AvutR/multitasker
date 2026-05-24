@@ -33,12 +33,14 @@ export interface IpcApi {
   'session:resume': (id: string) => SessionInfo
   'session:fork': (id: string) => SessionInfo
   'session:approvePlan': (args: { id: string; approved: boolean; feedback?: string }) => void
+  'session:reclaimIdle': () => number
 
   // Code traversal / review (scoped to a session's cwd/worktree)
   'fs:readDir': (args: { sessionId: string; relPath: string }) => FileEntry[]
   'fs:readFile': (args: { sessionId: string; relPath: string }) => FileContent
   'git:diff': (args: { sessionId: string }) => DiffFile[]
   'git:commit': (args: { sessionId: string; message: string }) => CommitResult
+  'git:undoLastCommit': (args: { sessionId: string }) => { undone: boolean; subject?: string; reason?: string }
 
   // Policy engine
   'policy:get': () => { defs: ActionTypeDef[]; state: PolicyState }

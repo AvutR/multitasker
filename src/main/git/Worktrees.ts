@@ -80,6 +80,21 @@ export async function commitAll(cwd: string, message: string): Promise<CommitRes
   return { committed: true, hash: res.commit }
 }
 
+/** Undo the last commit, keeping its changes in the working tree (soft reset).
+ *  Makes "Land" reversible — the changes come back so you can re-review. */
+export async function undoLastCommit(cwd: string): Promise<{ undone: boolean; subject?: string; reason?: string }> {
+  const git = simpleGit(cwd)
+  try {
+    const log = await git.log({ maxCount: 1 })
+    const subject = log.latest?.message
+    await git.raw(['rev-parse', 'HEAD~1']) // throws if there's no parent (root commit)
+    await git.reset(['--soft', 'HEAD~1'])
+    return { undone: true, subject }
+  } catch {
+    return { undone: false, reason: 'no commit to undo' }
+  }
+}
+
 const MAX_DIFF_BYTES = 256_000
 
 // Keep the main process responsive and the IPC payload small: don't ship huge

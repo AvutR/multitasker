@@ -7,7 +7,7 @@ import type { EventBus } from '../events'
 import type { Repositories } from '../db/repositories'
 import type { SessionManager } from '../orchestrator/SessionManager'
 import type { WorktreeManager } from '../git/Worktrees'
-import { commitAll, computeDiff, readRepoMeta } from '../git/Worktrees'
+import { commitAll, computeDiff, readRepoMeta, undoLastCommit } from '../git/Worktrees'
 import { listDir, readFileScoped } from '../fs/fsAccess'
 import { getPreset, LAUNCH_PRESETS } from '../skills/launchPresets'
 import { listModels } from '../models'
@@ -44,6 +44,7 @@ export function registerIpcHandlers(ctx: AppContext): void {
   handle('session:resume', (id) => ctx.sessions.resume(id))
   handle('session:fork', (id) => ctx.sessions.fork(id))
   handle('session:approvePlan', ({ id, approved, feedback }) => ctx.sessions.approvePlan(id, approved, feedback))
+  handle('session:reclaimIdle', () => ctx.sessions.reclaimIdle())
 
   // Code traversal / review
   handle('fs:readDir', ({ sessionId, relPath }) => listDir(cwdFor(sessionId), relPath))
@@ -57,6 +58,11 @@ export function registerIpcHandlers(ctx: AppContext): void {
       ctx.sessions.markLanded(sessionId)
     }
     return result
+  })
+  handle('git:undoLastCommit', ({ sessionId }) => {
+    const info = ctx.repos.sessions.get(sessionId)
+    if (!info) throw new Error(`session not found: ${sessionId}`)
+    return undoLastCommit(info.cwd)
   })
 
   // Policy engine

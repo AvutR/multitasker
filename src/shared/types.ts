@@ -82,6 +82,25 @@ export interface PlanApprovalRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Mission Control board + "Needs you" inbox
+// ---------------------------------------------------------------------------
+
+export type NeedsYouKind = 'error' | 'plan' | 'action'
+
+/** A ranked item in the "Needs you" attention queue. */
+export interface NeedsYouItem {
+  kind: NeedsYouKind
+  sessionId: string
+  actionId?: string // present for action approvals
+  title: string
+  detail: string
+  waitedMs: number
+  priority: number // higher = more urgent
+}
+
+export type BoardGroup = 'needs_you' | 'running' | 'idle' | 'done'
+
+// ---------------------------------------------------------------------------
 // Integrations & the policy engine
 // ---------------------------------------------------------------------------
 
