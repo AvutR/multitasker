@@ -7,6 +7,7 @@ import { EventBus } from './events'
 import { WorktreeManager } from './git/Worktrees'
 import { ActionService, seedDefaultPolicies } from './integrations/ActionService'
 import { SdkConnectorGateway } from './integrations/ConnectorGateway'
+import { LinearService, SdkLinearReader } from './integrations/LinearService'
 import { LifecycleAutomation } from './orchestrator/LifecycleAutomation'
 import { SessionManager } from './orchestrator/SessionManager'
 import { registerIpcHandlers, type AppContext } from './ipc/handlers'
@@ -109,8 +110,9 @@ function bootstrap(): void {
   const automation = new LifecycleAutomation(bus, actions)
   const sessions = new SessionManager(repos, bus, actions, worktrees, automation)
   sessions.reconcileOnStartup()
+  const linear = new LinearService(new SdkLinearReader())
 
-  const ctx: AppContext = { repos, bus, sessions, actions, worktrees }
+  const ctx: AppContext = { repos, bus, sessions, actions, worktrees, linear }
   registerIpcHandlers(ctx)
 
   mainWindow = createWindow()

@@ -10,6 +10,7 @@ import type {
   FileContent,
   FileEntry,
   LaunchPreset,
+  LinearIssue,
   PlanApprovalRequest,
   PolicyMode,
   PolicyState,
@@ -48,6 +49,9 @@ export interface IpcApi {
   'actions:decide': (args: { id: string; approve: boolean }) => ActionRecord
 
   // Presets / settings / repos
+  // Linear inbox
+  'linear:myIssues': () => LinearIssue[]
+
   'presets:list': () => LaunchPreset[]
   'settings:get': () => AppSettings
   'settings:set': (patch: Partial<AppSettings>) => AppSettings

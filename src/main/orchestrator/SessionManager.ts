@@ -67,7 +67,8 @@ export class SessionManager {
     let branch: string | null = null
     let worktreePath: string | null = null
     if (useWorktree) {
-      const wt = await this.worktrees.create(req.cwd, `multitasker/${preset.id}-${id.slice(0, 8)}`)
+      const branchName = req.branchName?.trim() || `multitasker/${preset.id}-${id.slice(0, 8)}`
+      const wt = await this.worktrees.create(req.cwd, branchName)
       if (wt) {
         cwd = wt.worktreePath
         branch = wt.branch

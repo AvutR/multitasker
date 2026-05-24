@@ -6,11 +6,13 @@ import { Workspace } from './components/Workspace'
 import { PolicyConsole } from './components/PolicyConsole'
 import { ActivityFeed } from './components/ActivityFeed'
 import { NewSessionModal } from './components/NewSessionModal'
+import { LinearPanel } from './components/LinearPanel'
 
 export function App() {
   const init = useStore((s) => s.init)
   const ready = useStore((s) => s.ready)
   const [showNew, setShowNew] = useState(false)
+  const [showLinear, setShowLinear] = useState(false)
 
   useEffect(() => {
     void init()
@@ -18,7 +20,7 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-ink-900 text-[#d7dbe3]">
-      <Header onNew={() => setShowNew(true)} />
+      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} />
       <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: '300px minmax(0, 1fr) 380px' }}>
         <SessionsRail onNew={() => setShowNew(true)} />
         <Workspace />
@@ -28,6 +30,7 @@ export function App() {
         </aside>
       </div>
       {showNew && <NewSessionModal onClose={() => setShowNew(false)} />}
+      {showLinear && <LinearPanel onClose={() => setShowLinear(false)} />}
       {!ready && (
         <div className="pointer-events-none fixed inset-0 grid place-items-center">
           <span className="rounded bg-ink-700 px-3 py-1.5 text-sm text-[#8a93a6]">Connecting to orchestrator…</span>
@@ -37,7 +40,7 @@ export function App() {
   )
 }
 
-function Header({ onNew }: { onNew: () => void }) {
+function Header({ onNew, onLinear }: { onNew: () => void; onLinear: () => void }) {
   // Select the stable state slice; derive arrays in render. Returning
   // Object.values(...) directly from the selector makes a new array each call
   // and sends Zustand's useSyncExternalStore into an infinite loop.
@@ -69,6 +72,13 @@ function Header({ onNew }: { onNew: () => void }) {
           }`}
         >
           Dry-run {dryRun ? 'ON' : 'OFF'}
+        </button>
+        <button
+          onClick={onLinear}
+          title="Start work from a Linear issue assigned to you"
+          className="rounded bg-ink-600 px-2.5 py-1 font-medium text-[#b9c0cc] hover:bg-ink-500"
+        >
+          Linear
         </button>
         <button
           onClick={onNew}
