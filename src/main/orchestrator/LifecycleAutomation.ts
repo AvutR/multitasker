@@ -87,14 +87,10 @@ function actionsForTransition(info: SessionInfo, links: SessionAutomationLinks):
           payload: { pageId: links.notionPageId, content: `"${info.title}" landed a verified local commit via Multitasker.` }
         })
       }
-      if (links.slackChannel) {
-        out.push({
-          sessionId: sid,
-          actionType: 'slack.message',
-          summary: `Landed · ${info.title}`,
-          payload: { channel: links.slackChannel, text: `✅ *${info.title}* landed (local commit) — testable in staging.` }
-        })
-      }
+      // Slack is intentionally NOT auto-posted here — Slack messages are not
+      // automated for now. The slack.* action types remain available (gated in
+      // the Policy console) for explicit/agent-initiated posts; re-add a
+      // lifecycle Slack push here to turn auto-posting back on.
       break
     case 'error':
       if (links.linearIssueId) {
