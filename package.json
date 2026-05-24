@@ -8,12 +8,16 @@
   "license": "MIT",
   "main": "out/main/index.js",
   "scripts": {
+    "predev": "electron-rebuild -o better-sqlite3",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretest": "node -e \"require('better-sqlite3')\" 2>/dev/null || npm rebuild better-sqlite3",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "rebuild:electron": "electron-rebuild -f -o better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.150",
@@ -27,13 +31,14 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.19.41",
     "@types/react": "^18.3.29",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.5.0",
-    "electron": "^42.2.0",
+    "electron": "^30.5.1",
     "electron-vite": "^2.3.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
