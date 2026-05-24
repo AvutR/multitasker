@@ -18,8 +18,8 @@
     "test:watch": "vitest",
     "rebuild:electron": "electron-rebuild -f -o better-sqlite3",
     "rebuild:node": "npm rebuild better-sqlite3",
-    "package": "electron-vite build && electron-builder --dir",
-    "dist": "electron-vite build && electron-builder"
+    "package": "electron-vite build && electron-rebuild -f -o better-sqlite3 && electron-builder --dir",
+    "dist": "electron-vite build && electron-rebuild -f -o better-sqlite3 && electron-builder"
   },
   "build": {
     "appId": "ai.unbound.multitasker",
@@ -30,7 +30,7 @@
       "**/node_modules/better-sqlite3/**",
       "**/node_modules/@anthropic-ai/claude-agent-sdk/**"
     ],
-    "npmRebuild": true,
+    "npmRebuild": false,
     "mac": {
       "target": "dmg",
       "category": "public.app-category.developer-tools"
