@@ -11,7 +11,8 @@ Built for the Unbound velocity bar (see *Raising the Bar*): one place to drive 1
 - **Parallel agents.** Each session is its own Claude Code subprocess (`@anthropic-ai/claude-agent-sdk` `query()`), spawned with its own working directory / git worktree. A concurrency cap queues the rest. Spawn, **steer** (inject messages mid-run), stop, resume, fork.
 - **Skills by default — invoked by intent, no slash command.** Every session loads your installed skills/agents/commands (`settingSources: ['user','project','local']`) and is system-prompted to invoke them **proactively**: run the `/build` pipeline for feature work, `/council` for a thin spec, `/security-review` before landing, delegate to the `principal-*` subagents. Spawn with **Auto** (the default) and a [task router](src/main/skills/taskRouter.ts) picks the right skill/pipeline from your prompt — you never type `/`. The team pipeline from [websentry-ai/skills](https://github.com/websentry-ai/skills) is **vendored into [`.claude/`](.claude)**, so anyone opening this repo in Claude Code gets it with zero setup.
 - **Automatic pipeline updates on other apps.** Link a session to a Linear issue / Notion page / Slack channel and Multitasker auto-posts at lifecycle milestones — start → Linear *In Progress*, plan ready → comment, landed → *In Review* + Notion spec note + Slack post, error → blocked comment. Every update is routed through the same policy engine (internal AUTO-fires, outward posts queue for one-click approval, dry-run suppresses) — see [`LifecycleAutomation.ts`](src/main/orchestrator/LifecycleAutomation.ts).
-- **Start work from Linear.** The **Linear** button fetches the issues assigned to you (via your Linear connector — no separate token) and one-click-spawns a `/build` session per issue: the git branch is auto-named from the issue, the session is linked so lifecycle updates fire (In Progress → In Review), a Notion page referenced in the issue is auto-linked, and the task is pre-filled from the issue. Working directory defaults to your last-used repo — see [`LinearService.ts`](src/main/integrations/LinearService.ts).
+- **Start work from Linear.** The **Linear** button fetches the issues assigned to you (via your Linear connector — no separate token) and one-click-spawns a `/build` session per issue: the git branch is auto-named from the issue **and pushed to GitHub `origin`** (policy-gated `github.push_branch`; a no-op for local-only repos), the session is linked so lifecycle updates fire (In Progress → In Review), a Notion page referenced in the issue is auto-linked, and the task is pre-filled from the issue. Working directory defaults to your last-used repo — see [`LinearService.ts`](src/main/integrations/LinearService.ts).
+- **Model selection + multiple providers.** Pick the model per session in the New Session modal. Anthropic Claude models run natively; Bedrock/Vertex run Claude on those clouds; and an Anthropic-compatible **gateway** (LiteLLM / OpenRouter, configured in settings) routes to other providers (GPT, Gemini). Each model carries the right env to the spawned Claude Code subprocess — see [`models.ts`](src/main/models.ts).
 - **Editor / review layer.** A Monaco-based file tree + editor (the "Copilot feel"), a side-by-side **diff review**, a live streaming transcript per agent, and an **inline plan-approval gate**.
 - **Policy-gated integrations.** A typed taxonomy of every external action (`linear.status_update`, `slack.standup_post`, `notion.spec_update`, …), each independently set to **AUTO / one-click APPROVE / OFF**, plus a **global dry-run** master switch. Internal bookkeeping (Linear/Notion) defaults AUTO; outward posts (Slack) default APPROVE. Every action is written to an append-only **audit log**.
 - **Local-commit landing.** No remote / no PR in this build — the in-app "Commit" lands a verified local commit on the session's worktree branch.
@@ -32,6 +33,17 @@ npm run typecheck    # tsc --noEmit
 npm test             # vitest (orchestration + policy engine, 44 tests)
 npm run build        # production bundle (electron-vite build)
 ```
+
+### Package it as a real app
+
+```bash
+npm run package   # → release/mac-arm64/Multitasker.app  (no DMG/signing — fastest)
+npm run dist      # → a distributable DMG
+```
+
+The packaged `.app` runs standalone (no dev server) and survives sleep like any
+macOS app. It's ad-hoc signed, so the first launch may need right-click → Open.
+electron-builder rebuilds `better-sqlite3` for the bundled Electron automatically.
 
 ### Native module note (better-sqlite3)
 

@@ -41,7 +41,9 @@ export class ActionService {
   constructor(
     private repos: Repositories,
     private bus: EventBus,
-    private gateway: ConnectorGateway
+    private gateway: ConnectorGateway,
+    // github.* actions are git-backed, not MCP — route them to a separate gateway.
+    private gitGateway: ConnectorGateway = { execute: async () => ({ ok: true, result: { skipped: 'no github gateway' } }) }
   ) {}
 
   list(limit = 200): ActionRecord[] {
@@ -155,8 +157,9 @@ export class ActionService {
 
   private async execute(rec: ActionRecord, decidedBy: ActionDecidedBy): Promise<ActionRecord> {
     const def = ACTION_TYPE_BY_ID[rec.actionType]
+    const gateway = def.connector === 'github' ? this.gitGateway : this.gateway
     try {
-      const res = await this.gateway.execute({
+      const res = await gateway.execute({
         actionType: rec.actionType,
         connector: def.connector,
         payload: rec.payload,

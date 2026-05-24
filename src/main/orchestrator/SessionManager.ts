@@ -31,7 +31,7 @@ export class SessionManager {
   constructor(
     private readonly repos: Repositories,
     private readonly bus: EventBus,
-    actions: ActionService,
+    private readonly actions: ActionService,
     private readonly worktrees: WorktreeManager,
     private readonly automation: LifecycleAutomation
   ) {
@@ -115,6 +115,16 @@ export class SessionManager {
       slackChannel: req.slackChannel ?? null,
       autoUpdates: req.autoUpdates ?? true
     })
+    // GitHub branching: when a branch name was supplied (e.g. from a Linear
+    // issue), push it to origin through the policy engine (no-op if no remote).
+    if (worktreePath && branch && req.branchName?.trim()) {
+      void this.actions.propose({
+        sessionId: id,
+        actionType: 'github.push_branch',
+        summary: `Push branch ${branch}`,
+        payload: { cwd: worktreePath, branch }
+      })
+    }
     this.enqueue({ session, prompt: req.prompt, kind: 'start' })
     return session.snapshot()
   }

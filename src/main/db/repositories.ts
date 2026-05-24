@@ -11,7 +11,7 @@ import type { Db } from './database'
 export const DEFAULT_SETTINGS: AppSettings = {
   dryRun: true, // safe by default during bring-up — never hits a live connector
   concurrencyCap: 4,
-  defaultModel: 'claude-opus-4-7'
+  defaultModel: 'opus' // a ModelOption id (see main/models.ts)
 }
 
 // --- row shapes ------------------------------------------------------------

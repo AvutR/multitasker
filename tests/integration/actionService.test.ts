@@ -143,3 +143,25 @@ describe('audit log', () => {
     expect(svc.list()).toHaveLength(3)
   })
 })
+
+describe('github actions route to the git gateway', () => {
+  it('github.push_branch fires via the git gateway, not the connector gateway', async () => {
+    const db = openDatabase(':memory:')
+    const repos = createRepositories(db)
+    seedDefaultPolicies(repos)
+    repos.settings.set({ dryRun: false })
+    const bus = new EventBus()
+    const connector = new FakeGateway()
+    const git = new FakeGateway()
+    const svc = new ActionService(repos, bus, connector, git)
+    const rec = await svc.propose({
+      sessionId: 's',
+      actionType: 'github.push_branch',
+      summary: 'push',
+      payload: { cwd: '/x', branch: 'b' }
+    })
+    expect(rec.status).toBe('fired')
+    expect(git.calls).toHaveLength(1)
+    expect(connector.calls).toHaveLength(0)
+  })
+})
