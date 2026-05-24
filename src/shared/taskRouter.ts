@@ -4,7 +4,7 @@
 
 const RULES: { test: RegExp; preset: string }[] = [
   { test: /\b(stand[- ]?up|status update|what (did|have) (we|i) ship)/i, preset: 'standup' },
-  { test: /\b(linear|backlog|ticket|issue hygiene|cycle|sprint board|triage)/i, preset: 'linear-sync' },
+  { test: /\b(linear|backlog|ticket|issue hygiene|cycle|sprint board|triage)/i, preset: 'tracker-sync' },
   { test: /\b(build|implement|add|create|fix|refactor|ship|feature|endpoint|bug|migrate|wire up|write)/i, preset: 'build' }
 ]
 

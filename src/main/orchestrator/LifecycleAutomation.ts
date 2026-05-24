@@ -12,7 +12,7 @@ export interface SessionAutomationLinks {
 
 /**
  * Turns session lifecycle transitions into automatic, policy-gated updates on
- * other applications (Raising the Bar: "no excuse for stale Linear"). Decoupled
+ * other applications, so your issue tracker and specs never go stale. Decoupled
  * from the orchestrator — it subscribes to session:updated, fires once per
  * status per session, and routes every action through ActionService so the
  * AUTO/APPROVE/OFF policy and dry-run still apply.

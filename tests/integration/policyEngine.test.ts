@@ -57,7 +57,7 @@ describe('effectiveMode', () => {
   })
 })
 
-describe('action taxonomy defaults encode the Raising the Bar rule', () => {
+describe('action taxonomy defaults encode the safe-by-default policy', () => {
   it('internal bookkeeping (Linear/Notion) defaults AUTO', () => {
     expect(ACTION_TYPE_BY_ID['linear.status_update'].defaultPolicy).toBe('auto')
     expect(ACTION_TYPE_BY_ID['notion.spec_update'].defaultPolicy).toBe('auto')
