@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import type { IpcApi, IpcChannel, IpcPayload, IpcResult } from '@shared/ipc'
 import { ACTION_TYPES } from '../integrations/actionTypes'
 import type { ActionService } from '../integrations/ActionService'
+import type { LinearService } from '../integrations/LinearService'
 import type { EventBus } from '../events'
 import type { Repositories } from '../db/repositories'
 import type { SessionManager } from '../orchestrator/SessionManager'
@@ -16,6 +17,7 @@ export interface AppContext {
   sessions: SessionManager
   actions: ActionService
   worktrees: WorktreeManager
+  linear: LinearService
 }
 
 export function registerIpcHandlers(ctx: AppContext): void {
@@ -64,6 +66,9 @@ export function registerIpcHandlers(ctx: AppContext): void {
   // Actions / audit log / approval queue
   handle('actions:list', ({ limit }) => ctx.actions.list(limit))
   handle('actions:decide', ({ id, approve }) => ctx.actions.decide(id, approve))
+
+  // Linear inbox
+  handle('linear:myIssues', () => ctx.linear.listMyIssues())
 
   // Presets / settings / repos
   handle('presets:list', () => LAUNCH_PRESETS)

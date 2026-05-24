@@ -166,6 +166,19 @@ export interface SpawnRequest {
   slackChannel?: string
   /** Default true — auto-post lifecycle updates (policy still applies). */
   autoUpdates?: boolean
+  /** Branch name for the session's worktree (e.g. derived from a Linear issue). */
+  branchName?: string
+}
+
+/** An issue fetched from Linear (assigned to the current user). */
+export interface LinearIssue {
+  id: string
+  identifier: string // e.g. ENG-1234
+  title: string
+  url: string
+  state: string
+  branchName: string // Linear's suggested git branch name
+  description?: string
 }
 
 export interface AppSettings {

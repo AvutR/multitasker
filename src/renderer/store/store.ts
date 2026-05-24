@@ -5,6 +5,7 @@ import type {
   ActionTypeDef,
   AppSettings,
   LaunchPreset,
+  LinearIssue,
   PlanApprovalRequest,
   PolicyMode,
   PolicyState,
@@ -28,6 +29,9 @@ interface State {
   settings: AppSettings
   presets: LaunchPreset[]
   repos: RepoInfo[]
+  myLinearIssues: LinearIssue[]
+  linearLoading: boolean
+  linearError: string | null
 
   init: () => Promise<void>
   select: (id: string) => Promise<void>
@@ -42,6 +46,8 @@ interface State {
   decideAction: (id: string, approve: boolean) => Promise<void>
   addRepo: (path: string) => Promise<void>
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>
+  fetchLinearIssues: () => Promise<void>
+  startFromIssue: (issue: LinearIssue, cwd: string) => Promise<void>
 }
 
 const MAX_MESSAGES = 1000 // per-session transcript retained in memory (full history in SQLite)
@@ -66,6 +72,9 @@ export const useStore = create<State>((set, get) => ({
   settings: { dryRun: true, concurrencyCap: 4, defaultModel: 'claude-opus-4-7' },
   presets: [],
   repos: [],
+  myLinearIssues: [],
+  linearLoading: false,
+  linearError: null,
 
   init: async () => {
     const [list, policy, settings, presets, repos, actions] = await Promise.all([
@@ -156,8 +165,37 @@ export const useStore = create<State>((set, get) => ({
   patchSettings: async (patch) => {
     const settings = await window.api.invoke('settings:set', patch)
     set({ settings })
+  },
+  fetchLinearIssues: async () => {
+    set({ linearLoading: true, linearError: null })
+    try {
+      const issues = await window.api.invoke('linear:myIssues')
+      set({ myLinearIssues: issues, linearLoading: false })
+    } catch (e) {
+      set({ linearLoading: false, linearError: e instanceof Error ? e.message : String(e) })
+    }
+  },
+  startFromIssue: async (issue, cwd) => {
+    await get().spawn({
+      prompt: `${issue.identifier} — ${issue.title}\n\n${issue.description ?? ''}`.trim(),
+      cwd,
+      presetId: 'build',
+      title: `${issue.identifier} ${issue.title}`.slice(0, 80),
+      linearIssueId: issue.id,
+      notionPageId: extractNotionUrl(issue.description),
+      branchName: issue.branchName,
+      useWorktree: true
+    })
   }
 }))
+
+/** Pull a Notion page URL out of an issue description so lifecycle updates can
+ *  keep the linked spec current too. */
+function extractNotionUrl(text?: string): string | undefined {
+  if (!text) return undefined
+  const m = text.match(/https?:\/\/(?:www\.)?notion\.so\/[^\s)]+/i)
+  return m?.[0]
+}
 
 function applyEvent(
   set: (fn: (st: State) => Partial<State>) => void,
