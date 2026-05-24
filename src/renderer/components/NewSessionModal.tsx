@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { routePreset } from '@shared/taskRouter'
 import { useStore } from '../store/store'
 
 export function NewSessionModal({ onClose }: { onClose: () => void }) {
@@ -80,8 +81,13 @@ export function NewSessionModal({ onClose }: { onClose: () => void }) {
           <p className="mt-1 text-[11px] leading-snug text-[#6b7280]">
             {preset
               ? preset.description
-              : 'Picks the matching skill/pipeline from your task — feature work → /build, "standup" → standup, "linear" → Linear sync — no slash command needed.'}
+              : 'Picks the matching skill/pipeline from your task — no slash command needed.'}
           </p>
+          {!preset && prompt.trim() && (
+            <p className="mt-1 text-[11px] text-accent">
+              → routes to: {presets.find((p) => p.id === routePreset(prompt))?.name ?? routePreset(prompt)}
+            </p>
+          )}
         </Label>
 
         <Label text="Model">

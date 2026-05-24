@@ -18,6 +18,7 @@ import type {
 
 interface State {
   ready: boolean
+  view: 'board' | 'session'
   sessions: Record<string, SessionInfo>
   order: string[]
   selectedId: string | null
@@ -36,7 +37,10 @@ interface State {
   models: ModelOption[]
 
   init: () => Promise<void>
+  openBoard: () => void
   select: (id: string) => Promise<void>
+  reclaimIdle: () => Promise<number>
+  undoLastCommit: (sessionId: string) => Promise<{ undone: boolean; subject?: string; reason?: string }>
   spawn: (req: SpawnRequest) => Promise<SessionInfo>
   steer: (id: string, text: string) => Promise<void>
   stop: (id: string) => Promise<void>
@@ -62,6 +66,7 @@ const byNewest = (s: Record<string, SessionInfo>): string[] =>
 
 export const useStore = create<State>((set, get) => ({
   ready: false,
+  view: 'board',
   sessions: {},
   order: [],
   selectedId: null,
@@ -104,11 +109,13 @@ export const useStore = create<State>((set, get) => ({
       models
     })
     window.api.on((evt) => applyEvent(set, get, evt))
-    if (!get().selectedId && list[0]) void get().select(list[0].id)
+    // Board-first: land on Mission Control, don't auto-drill into a session.
   },
 
+  openBoard: () => set({ view: 'board' }),
+
   select: async (id) => {
-    set({ selectedId: id })
+    set({ selectedId: id, view: 'session' })
     const data = await window.api.invoke('session:get', id)
     if (data) {
       set((st) => ({
@@ -122,7 +129,7 @@ export const useStore = create<State>((set, get) => ({
     const info = await window.api.invoke('session:spawn', req)
     set((st) => {
       const sessions = { ...st.sessions, [info.id]: info }
-      return { sessions, order: byNewest(sessions), selectedId: info.id }
+      return { sessions, order: byNewest(sessions), selectedId: info.id, view: 'session' as const }
     })
     return info
   },
@@ -140,7 +147,7 @@ export const useStore = create<State>((set, get) => ({
     const info = await window.api.invoke('session:fork', id)
     set((st) => {
       const sessions = { ...st.sessions, [info.id]: info }
-      return { sessions, order: byNewest(sessions), selectedId: info.id }
+      return { sessions, order: byNewest(sessions), selectedId: info.id, view: 'session' as const }
     })
   },
   approvePlan: async (id, approved, feedback) => {
@@ -171,6 +178,8 @@ export const useStore = create<State>((set, get) => ({
     const settings = await window.api.invoke('settings:set', patch)
     set({ settings })
   },
+  reclaimIdle: async () => window.api.invoke('session:reclaimIdle'),
+  undoLastCommit: async (sessionId) => window.api.invoke('git:undoLastCommit', { sessionId }),
   fetchLinearIssues: async () => {
     set({ linearLoading: true, linearError: null })
     try {

@@ -43,3 +43,36 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Semantic token layer (v2.0 dark). v2.1 adds a light-theme values block here. */
+:root {
+  --bg-base: #0b0d12;
+  --bg-surface: #11141b;
+  --bg-raised: #181c26;
+  --border: #222734;
+  --text-primary: #d7dbe3;
+  --text-secondary: #8a93a6;
+  --text-muted: #5b6472;
+  --accent: #6ea8fe;
+  --state-needs-you: #f5c451;
+  --state-ok: #5bd4a4;
+  --state-error: #f06d6d;
+}
+
+/* Keyboard-first: focus is the cursor — make it always visible. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* Respect reduced-motion: no shimmer/pulse/transitions when the OS asks. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
