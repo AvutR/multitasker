@@ -254,3 +254,29 @@ describe('resume after stop uses a fresh queue', () => {
     expect(runs).toBe(2)
   })
 })
+
+describe('integration MCP server wiring', () => {
+  it('passes the SDK MCP server config through without double-wrapping', async () => {
+    const { repos, bus, actions } = deps()
+    let captured: Record<string, unknown> | undefined
+    h.queryImpl = (args) => {
+      captured = args.options
+      return (async function* () {
+        yield { type: 'system', session_id: 'sdk-mcp' }
+        yield { type: 'result', subtype: 'success' }
+      })()
+    }
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+    session.start('go')
+    await session.whenDone()
+
+    const servers = captured?.mcpServers as Record<string, { type?: string; tools?: unknown; instance?: unknown }>
+    const entry = servers['multitasker-integrations']
+    expect(entry.type).toBe('sdk')
+    // createSdkMcpServer's result is passed straight through (it carries `tools`),
+    // NOT re-wrapped in another { instance } layer.
+    expect(Array.isArray(entry.tools)).toBe(true)
+    expect('instance' in entry).toBe(false)
+  })
+})

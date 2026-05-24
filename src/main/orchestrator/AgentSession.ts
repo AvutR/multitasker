@@ -120,12 +120,12 @@ export class AgentSession {
       includePartialMessages: true,
       abortController: this.abort,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: this.launch.systemPromptAppend },
+      // createSdkMcpServer already returns the full { type:'sdk', name, instance }
+      // config — pass it through directly. Wrapping it again points `.instance`
+      // at the config object, and the SDK then calls `.connect` on the wrong
+      // thing ("Q.connect is not a function").
       mcpServers: {
-        'multitasker-integrations': {
-          type: 'sdk',
-          name: 'multitasker-integrations',
-          instance: integrationServer
-        }
+        'multitasker-integrations': integrationServer
       },
       canUseTool: this.canUseTool
     }
