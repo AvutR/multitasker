@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { join } from 'node:path'
 import { app, BrowserWindow, session, shell } from 'electron'
 import { EVENT_CHANNEL } from '@shared/ipc'
@@ -99,7 +100,24 @@ function applyCsp(): void {
   })
 }
 
+// A GUI-launched app (Finder/Dock/`open`) inherits launchd's minimal PATH, not
+// your login shell's — so spawned subprocesses (the claude CLI, git, MCP servers)
+// wouldn't be found. Resolve the login-shell PATH once and adopt it.
+function fixPathForPackagedApp(): void {
+  if (!app.isPackaged) return
+  try {
+    const shell = process.env.SHELL || '/bin/zsh'
+    const out = execSync(`${shell} -ilc 'printf "%s" "$PATH"'`, { encoding: 'utf8', timeout: 5000 }).trim()
+    if (out) process.env.PATH = out
+  } catch {
+    const home = process.env.HOME ?? ''
+    const extra = ['/opt/homebrew/bin', '/usr/local/bin', `${home}/.local/bin`, `${home}/.npm-global/bin`]
+    process.env.PATH = [...extra, process.env.PATH ?? ''].filter(Boolean).join(':')
+  }
+}
+
 function bootstrap(): void {
+  fixPathForPackagedApp()
   applyCsp()
   const db = openDatabase(join(app.getPath('userData'), 'multitasker.db'))
   const repos = createRepositories(db)

@@ -26,7 +26,10 @@
     "productName": "Multitasker",
     "directories": { "output": "release" },
     "files": ["out/**/*", "package.json"],
-    "asarUnpack": ["**/node_modules/better-sqlite3/**"],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/@anthropic-ai/claude-agent-sdk/**"
+    ],
     "npmRebuild": true,
     "mac": {
       "target": "dmg",
