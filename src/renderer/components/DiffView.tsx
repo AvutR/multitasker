@@ -5,6 +5,7 @@ import { MonacoDiff } from './MonacoDiff'
 
 export function DiffView({ sessionId }: { sessionId: string }) {
   const branch = useStore((s) => s.sessions[sessionId]?.branch)
+  const undoLastCommit = useStore((s) => s.undoLastCommit)
   const [files, setFiles] = useState<DiffFile[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [message, setMessage] = useState('')
@@ -44,6 +45,17 @@ export function DiffView({ sessionId }: { sessionId: string }) {
         setMessage('')
         await reload()
       }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const undo = async () => {
+    setBusy(true)
+    try {
+      const r = await undoLastCommit(sessionId)
+      setNote(r.undone ? `Undid "${(r.subject ?? '').slice(0, 40)}" — changes restored to the working tree` : r.reason ?? 'nothing to undo')
+      if (r.undone) await reload()
     } finally {
       setBusy(false)
     }
@@ -100,7 +112,15 @@ export function DiffView({ sessionId }: { sessionId: string }) {
           disabled={busy || !message.trim() || files.length === 0}
           className="rounded bg-accent px-3 py-1.5 text-sm font-semibold text-ink-900 disabled:opacity-40 hover:bg-[#8bbcff]"
         >
-          {busy ? 'Committing…' : 'Commit'}
+          {busy ? 'Committing…' : 'Land (commit)'}
+        </button>
+        <button
+          onClick={() => void undo()}
+          disabled={busy}
+          title="Soft-reset the last commit; changes return to the working tree"
+          className="rounded border border-ink-500 px-3 py-1.5 text-sm text-[#b9c0cc] disabled:opacity-40 hover:bg-ink-700"
+        >
+          Undo
         </button>
         {note && <span className="text-[11px] text-[#6b7280]">{note}</span>}
       </div>

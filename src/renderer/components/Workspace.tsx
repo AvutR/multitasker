@@ -4,6 +4,7 @@ import { formatCost, StatusDot } from './bits'
 import { Transcript } from './Transcript'
 import { CodeView } from './CodeView'
 import { DiffView } from './DiffView'
+import { TrustBar } from './TrustBar'
 
 type Tab = 'transcript' | 'code' | 'diff'
 const TABS: { id: Tab; label: string }[] = [
@@ -36,6 +37,9 @@ export function Workspace() {
             {session.model && <span>{models.find((m) => m.id === session.model)?.label ?? session.model}</span>}
             <span>{session.numTurns} turns</span>
             <span className="tabular-nums">{formatCost(session.totalCostUsd)}</span>
+          </div>
+          <div className="mt-0.5">
+            <TrustBar sessionId={session.id} branch={session.branch} />
           </div>
         </div>
         <div className="flex gap-1">
