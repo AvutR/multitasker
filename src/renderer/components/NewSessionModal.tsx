@@ -4,10 +4,13 @@ import { useStore } from '../store/store'
 export function NewSessionModal({ onClose }: { onClose: () => void }) {
   const presets = useStore((s) => s.presets)
   const repos = useStore((s) => s.repos)
+  const models = useStore((s) => s.models)
+  const defaultModel = useStore((s) => s.settings.defaultModel)
   const spawn = useStore((s) => s.spawn)
   const addRepo = useStore((s) => s.addRepo)
 
   const [presetId, setPresetId] = useState('auto')
+  const [model, setModel] = useState(defaultModel)
   const [cwd, setCwd] = useState(repos[0]?.path ?? '')
   const [newRepoPath, setNewRepoPath] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -31,6 +34,7 @@ export function NewSessionModal({ onClose }: { onClose: () => void }) {
       await spawn({
         prompt: prompt.trim(),
         presetId,
+        model,
         cwd: cwd.trim(),
         title: title.trim() || undefined,
         linearIssueId: linearIssueId.trim() || undefined,
@@ -78,6 +82,21 @@ export function NewSessionModal({ onClose }: { onClose: () => void }) {
               ? preset.description
               : 'Picks the matching skill/pipeline from your task — feature work → /build, "standup" → standup, "linear" → Linear sync — no slash command needed.'}
           </p>
+        </Label>
+
+        <Label text="Model">
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full rounded border border-ink-500 bg-ink-700 px-2 py-1.5 text-sm"
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+                {m.provider !== 'anthropic' ? ` · ${m.provider}` : ''}
+              </option>
+            ))}
+          </select>
         </Label>
 
         <Label text="Working directory">

@@ -6,6 +6,7 @@ import type {
   AppSettings,
   LaunchPreset,
   LinearIssue,
+  ModelOption,
   PlanApprovalRequest,
   PolicyMode,
   PolicyState,
@@ -32,6 +33,7 @@ interface State {
   myLinearIssues: LinearIssue[]
   linearLoading: boolean
   linearError: string | null
+  models: ModelOption[]
 
   init: () => Promise<void>
   select: (id: string) => Promise<void>
@@ -75,15 +77,17 @@ export const useStore = create<State>((set, get) => ({
   myLinearIssues: [],
   linearLoading: false,
   linearError: null,
+  models: [],
 
   init: async () => {
-    const [list, policy, settings, presets, repos, actions] = await Promise.all([
+    const [list, policy, settings, presets, repos, actions, models] = await Promise.all([
       window.api.invoke('session:list'),
       window.api.invoke('policy:get'),
       window.api.invoke('settings:get'),
       window.api.invoke('presets:list'),
       window.api.invoke('repos:list'),
-      window.api.invoke('actions:list', { limit: 200 })
+      window.api.invoke('actions:list', { limit: 200 }),
+      window.api.invoke('models:list')
     ])
     const sessions: Record<string, SessionInfo> = {}
     for (const s of list) sessions[s.id] = s
@@ -96,7 +100,8 @@ export const useStore = create<State>((set, get) => ({
       settings,
       presets,
       repos,
-      actions
+      actions,
+      models
     })
     window.api.on((evt) => applyEvent(set, get, evt))
     if (!get().selectedId && list[0]) void get().select(list[0].id)

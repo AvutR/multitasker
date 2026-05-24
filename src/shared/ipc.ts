@@ -11,6 +11,7 @@ import type {
   FileEntry,
   LaunchPreset,
   LinearIssue,
+  ModelOption,
   PlanApprovalRequest,
   PolicyMode,
   PolicyState,
@@ -51,6 +52,9 @@ export interface IpcApi {
   // Presets / settings / repos
   // Linear inbox
   'linear:myIssues': () => LinearIssue[]
+
+  // Models
+  'models:list': () => ModelOption[]
 
   'presets:list': () => LaunchPreset[]
   'settings:get': () => AppSettings

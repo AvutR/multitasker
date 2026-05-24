@@ -184,7 +184,22 @@ export interface LinearIssue {
 export interface AppSettings {
   dryRun: boolean
   concurrencyCap: number
-  defaultModel: string
+  defaultModel: string // a ModelOption id (see main/models.ts)
+  // Optional Anthropic-compatible gateway for non-Anthropic providers
+  // (LiteLLM / OpenRouter / Bedrock-proxy / etc.).
+  gatewayBaseUrl?: string
+  gatewayApiKey?: string
+  gatewayModel?: string
+  gatewayLabel?: string
+}
+
+export type ModelProvider = 'anthropic' | 'bedrock' | 'vertex' | 'gateway'
+
+export interface ModelOption {
+  id: string // stable registry id, stored on the session
+  label: string
+  provider: ModelProvider
+  sdkModel: string // the model string handed to the Agent SDK
 }
 
 export interface RepoInfo {

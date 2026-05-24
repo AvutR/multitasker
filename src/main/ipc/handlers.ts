@@ -10,6 +10,7 @@ import type { WorktreeManager } from '../git/Worktrees'
 import { commitAll, computeDiff, readRepoMeta } from '../git/Worktrees'
 import { listDir, readFileScoped } from '../fs/fsAccess'
 import { getPreset, LAUNCH_PRESETS } from '../skills/launchPresets'
+import { listModels } from '../models'
 
 export interface AppContext {
   repos: Repositories
@@ -69,6 +70,9 @@ export function registerIpcHandlers(ctx: AppContext): void {
 
   // Linear inbox
   handle('linear:myIssues', () => ctx.linear.listMyIssues())
+
+  // Models
+  handle('models:list', () => listModels(ctx.repos.settings.get()))
 
   // Presets / settings / repos
   handle('presets:list', () => LAUNCH_PRESETS)

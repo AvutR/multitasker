@@ -83,7 +83,16 @@ export const ACTION_TYPES: ActionTypeDef[] = [
     defaultPolicy: 'approve',
     enabled: true
   },
-  // --- GitHub (outward post) — disabled in v1 (no-remote constraint) --------
+  // --- GitHub ---------------------------------------------------------------
+  {
+    id: 'github.push_branch',
+    connector: 'github',
+    direction: 'outward_post',
+    label: 'GitHub · push branch',
+    description: 'Push the session worktree branch (named from the Linear issue) to origin. No-op if the repo has no remote.',
+    defaultPolicy: 'auto',
+    enabled: true
+  },
   {
     id: 'github.pr_create',
     connector: 'github',
