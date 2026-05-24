@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
+import { idleSessionIds } from '@shared/board'
 import type { Repositories } from '../db/repositories'
 import type { EventBus } from '../events'
 import type { ActionService } from '../integrations/ActionService'
@@ -143,6 +144,13 @@ export class SessionManager {
 
   markLanded(id: string): void {
     this.sessions.get(id)?.markLanded()
+  }
+
+  /** Stop idle (awaiting_input) sessions to free their held concurrency slots. */
+  reclaimIdle(): number {
+    const ids = idleSessionIds(this.list())
+    for (const id of ids) this.stop(id)
+    return ids.length
   }
 
   resume(id: string): SessionInfo {
