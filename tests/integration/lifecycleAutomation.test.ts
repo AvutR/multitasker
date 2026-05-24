@@ -50,7 +50,7 @@ describe('LifecycleAutomation — automatic pipeline updates on other apps', () 
     expect(actions.list().some((a) => a.actionType === 'linear.status_update' && a.status === 'fired')).toBe(true)
   })
 
-  it('on landed: Linear + Notion auto-fire, the Slack post queues for approval', async () => {
+  it('on landed: Linear + Notion auto-fire; Slack is never auto-posted', async () => {
     const { bus, actions, auto } = setup()
     auto.register('s1', { linearIssueId: 'ENG-1', notionPageId: 'pg', slackChannel: '#eng', autoUpdates: true })
     bus.emit({ channel: 'session:updated', payload: info({ status: 'landed' }) })
@@ -58,8 +58,8 @@ describe('LifecycleAutomation — automatic pipeline updates on other apps', () 
     const a = actions.list()
     expect(a.find((x) => x.actionType === 'linear.status_update')?.status).toBe('fired')
     expect(a.find((x) => x.actionType === 'notion.spec_update')?.status).toBe('fired')
-    // outward posts default to APPROVE → queued, not auto-sent
-    expect(a.find((x) => x.actionType === 'slack.message')?.status).toBe('pending')
+    // Slack is not automated — no slack action is generated even with a channel linked
+    expect(a.some((x) => x.actionType === 'slack.message')).toBe(false)
   })
 
   it('fires each status at most once (dedupe)', async () => {
