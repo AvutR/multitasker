@@ -46,9 +46,28 @@ function createWindow(): BrowserWindow {
     if (!allowed) event.preventDefault()
   })
 
+  // Surface renderer failures in the terminal (a blank/black window is almost
+  // always an uncaught error during renderer module load).
+  win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    if (level >= 2) console.log(`[renderer] ${message}  (${sourceId}:${line})`)
+  })
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error(`[did-fail-load] ${code} ${desc} ${url}`)
+  })
+  win.webContents.on('render-process-gone', (_e, details) => {
+    console.error(`[render-process-gone] reason=${details.reason} exitCode=${details.exitCode}`)
+  })
+  win.webContents.on('preload-error', (_e, preloadPath, error) => {
+    console.error(`[preload-error] ${preloadPath}: ${error.message}`)
+  })
+
   const devUrl = process.env['ELECTRON_RENDERER_URL']
-  if (devUrl) void win.loadURL(devUrl)
-  else void win.loadFile(join(__dirname, '../renderer/index.html'))
+  if (devUrl) {
+    void win.loadURL(devUrl)
+    win.webContents.openDevTools({ mode: 'detach' })
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'))
+  }
 
   return win
 }

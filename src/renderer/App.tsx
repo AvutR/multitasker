@@ -38,10 +38,14 @@ export function App() {
 }
 
 function Header({ onNew }: { onNew: () => void }) {
-  const sessions = useStore((s) => Object.values(s.sessions))
+  // Select the stable state slice; derive arrays in render. Returning
+  // Object.values(...) directly from the selector makes a new array each call
+  // and sends Zustand's useSyncExternalStore into an infinite loop.
+  const sessionMap = useStore((s) => s.sessions)
   const dryRun = useStore((s) => s.policy.dryRun)
   const setDryRun = useStore((s) => s.setDryRun)
 
+  const sessions = Object.values(sessionMap)
   const active = sessions.filter((s) => s.status === 'running' || s.status === 'awaiting_plan_approval').length
   const queued = sessions.filter((s) => s.status === 'queued').length
   const cost = sessions.reduce((sum, s) => sum + s.totalCostUsd, 0)
