@@ -1,5 +1,10 @@
 import type { ActionRecord, BoardGroup, NeedsYouItem, PlanApprovalRequest, SessionInfo } from './types'
 
+/** A non-live session (its subprocess is gone) that resume() can re-run. */
+export function isRevivableStatus(status: SessionInfo['status']): boolean {
+  return status === 'stopped' || status === 'error' || status === 'completed' || status === 'landed'
+}
+
 // Kind dominates the rank (error > plan > action); wait-time only breaks ties
 // within a kind (capped so it can never outrank a more urgent kind).
 const KIND_WEIGHT: Record<NeedsYouItem['kind'], number> = { error: 300, plan: 200, action: 100 }

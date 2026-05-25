@@ -13,6 +13,7 @@ export function NeedsYouInbox() {
   const approvePlan = useStore((s) => s.approvePlan)
   const decideAction = useStore((s) => s.decideAction)
   const deleteSession = useStore((s) => s.deleteSession)
+  const resume = useStore((s) => s.resume)
 
   const items = rankNeedsYou(Object.values(sessions), Object.values(planRequests), actions)
   const running = Object.values(sessions).filter((s) => s.status === 'running').length
@@ -76,6 +77,9 @@ export function NeedsYouInbox() {
             )}
             {item.kind === 'error' && (
               <>
+                <button onClick={() => void resume(item.sessionId)} title="Retry — resume this session" className="rounded border border-[#5bd4a4]/40 px-2 py-1 text-[11px] font-medium text-[#5bd4a4] hover:bg-[#5bd4a4]/10">
+                  ↻ Retry
+                </button>
                 <button onClick={() => void select(item.sessionId)} className="rounded border border-ink-500 px-2 py-1 text-[11px] text-[#b9c0cc] hover:bg-ink-700">
                   Open
                 </button>
