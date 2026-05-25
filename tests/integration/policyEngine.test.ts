@@ -66,8 +66,10 @@ describe('action taxonomy defaults encode the safe-by-default policy', () => {
     expect(ACTION_TYPE_BY_ID['slack.standup_post'].defaultPolicy).toBe('approve')
     expect(ACTION_TYPE_BY_ID['slack.message'].defaultPolicy).toBe('approve')
   })
-  it('GitHub PR actions are disabled in v1 (no-remote constraint)', () => {
-    expect(ACTION_TYPE_BY_ID['github.pr_create'].enabled).toBe(false)
-    expect(ACTION_TYPE_BY_ID['github.pr_comment'].enabled).toBe(false)
+  it('GitHub PR actions are enabled and gated (default APPROVE)', () => {
+    expect(ACTION_TYPE_BY_ID['github.pr_create'].enabled).toBe(true)
+    expect(ACTION_TYPE_BY_ID['github.pr_create'].defaultPolicy).toBe('approve')
+    expect(ACTION_TYPE_BY_ID['github.pr_comment'].enabled).toBe(true)
+    expect(ACTION_TYPE_BY_ID['github.pr_comment'].defaultPolicy).toBe('approve')
   })
 })

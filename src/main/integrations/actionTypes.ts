@@ -98,18 +98,18 @@ export const ACTION_TYPES: ActionTypeDef[] = [
     connector: 'github',
     direction: 'outward_post',
     label: 'GitHub · create PR',
-    description: 'Open a pull request. Disabled in v1 — Multitasker lands verified local commits only.',
+    description: 'Open a pull request on the session repo via gh. Gated — defaults to one-click approval.',
     defaultPolicy: 'approve',
-    enabled: false
+    enabled: true
   },
   {
     id: 'github.pr_comment',
     connector: 'github',
     direction: 'outward_post',
     label: 'GitHub · comment on PR',
-    description: 'Comment on a pull request. Disabled in v1 — local commits only.',
+    description: 'Comment on a pull request via gh. Gated — defaults to one-click approval.',
     defaultPolicy: 'approve',
-    enabled: false
+    enabled: true
   }
 ]
 
