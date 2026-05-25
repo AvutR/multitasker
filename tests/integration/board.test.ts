@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionRecord, PlanApprovalRequest, SessionInfo } from '@shared/types'
-import { groupSessions, idleSessionIds, isRevivableStatus, rankNeedsYou } from '../../src/shared/board'
+import { deriveWorkState, groupSessions, idleSessionIds, isRevivableStatus, rankNeedsYou } from '../../src/shared/board'
 
 function session(over: Partial<SessionInfo>): SessionInfo {
   return {
@@ -93,6 +93,16 @@ describe('groupSessions', () => {
     expect(g.done.map((s) => s.id)).toEqual(['6', '7', '8'])
   })
 
+  it('keeps a stopped-but-active session in Idle (resumable), not buried in Done', () => {
+    const g = groupSessions([
+      session({ id: 'paused', status: 'stopped', workState: 'active' }), // e.g. paused by an app restart
+      session({ id: 'finished', status: 'stopped', workState: 'done' }),
+      session({ id: 'legacy', status: 'stopped' }) // pre-migration (no workState) → terminal
+    ])
+    expect(g.idle.map((s) => s.id)).toEqual(['paused'])
+    expect(g.done.map((s) => s.id)).toEqual(['finished', 'legacy'])
+  })
+
   it('floats pinned sessions to the top of their lane, preserving order otherwise', () => {
     const g = groupSessions([
       session({ id: 'r1', status: 'running' }),
@@ -103,6 +113,17 @@ describe('groupSessions', () => {
     ])
     expect(g.running.map((s) => s.id)).toEqual(['r2', 'r1', 'r3']) // pinned first; r1/r3 order kept (stable)
     expect(g.done.map((s) => s.id)).toEqual(['d2', 'd1'])
+  })
+})
+
+describe('deriveWorkState', () => {
+  it('maps terminal statuses; everything else is active', () => {
+    expect(deriveWorkState('completed')).toBe('done')
+    expect(deriveWorkState('landed')).toBe('review')
+    expect(deriveWorkState('stopped')).toBe('done') // unknown prior → terminal
+    for (const s of ['queued', 'running', 'awaiting_input', 'awaiting_plan_approval', 'error'] as const) {
+      expect(deriveWorkState(s)).toBe('active')
+    }
   })
 })
 

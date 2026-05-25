@@ -39,10 +39,21 @@ export class SessionManager {
     this.deps = { repos, bus, actions }
   }
 
-  /** Previously-live sessions can't survive a restart (their subprocess is gone). */
+  /** Previously-live sessions can't survive a restart (their subprocess is gone),
+   *  so mark them stopped — but their persistent workState is preserved by the
+   *  repo, so the board keeps active work resumable instead of burying it in Done.
+   *  Also re-register persisted tracker links (the links map is in-memory). */
   reconcileOnStartup(): void {
     for (const s of this.repos.sessions.list()) {
       if (LIVE_STATUSES.includes(s.status)) this.repos.sessions.update(s.id, { status: 'stopped' })
+      if (s.linearIssueId || s.notionPageId) {
+        this.automation.register(s.id, {
+          linearIssueId: s.linearIssueId ?? null,
+          notionPageId: s.notionPageId ?? null,
+          slackChannel: null,
+          autoUpdates: true
+        })
+      }
     }
   }
 
@@ -100,7 +111,10 @@ export class SessionManager {
       numTurns: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      error: null
+      error: null,
+      workState: 'active',
+      linearIssueId: req.linearIssueId ?? null,
+      notionPageId: req.notionPageId ?? null
     }
     this.repos.sessions.insert(info)
     this.bus.emit({ channel: 'session:updated', payload: info })
@@ -201,6 +215,7 @@ export class SessionManager {
       id: newId,
       title: `${src.title} (fork)`,
       status: 'queued',
+      workState: 'active', // fresh run; tracker link inherited via ...src
       totalCostUsd: 0,
       numTurns: 0,
       createdAt: Date.now(),

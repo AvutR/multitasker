@@ -6,6 +6,7 @@ import type {
   SessionInfo,
   TranscriptMessage
 } from '@shared/types'
+import { deriveWorkState } from '@shared/board'
 import type { Db } from './database'
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -34,6 +35,9 @@ interface SessionRow {
   updated_at: number
   error: string | null
   pinned: number
+  work_state: string | null
+  linear_issue_id: string | null
+  notion_page_id: string | null
 }
 
 interface MessageRow {
@@ -82,7 +86,23 @@ function toSession(r: SessionRow): SessionInfo {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     error: r.error,
-    pinned: r.pinned === 1
+    pinned: r.pinned === 1,
+    workState: (r.work_state as SessionInfo['workState']) ?? undefined,
+    linearIssueId: r.linear_issue_id,
+    notionPageId: r.notion_page_id
+  }
+}
+
+// Coerce a SessionInfo into bind-safe params: better-sqlite3 rejects raw
+// booleans and undefined for bound params, so pinned → 0/1 and the optional
+// columns → null.
+function bindSession(s: SessionInfo): Record<string, unknown> {
+  return {
+    ...s,
+    pinned: s.pinned ? 1 : 0,
+    workState: s.workState ?? null,
+    linearIssueId: s.linearIssueId ?? null,
+    notionPageId: s.notionPageId ?? null
   }
 }
 
@@ -125,30 +145,35 @@ export class SessionRepo {
     this.db
       .prepare(
         `INSERT INTO sessions (id, sdk_session_id, title, model, cwd, repo_id, branch, worktree_path,
-           status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error, pinned)
+           status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error,
+           pinned, work_state, linear_issue_id, notion_page_id)
          VALUES (@id, @sdkSessionId, @title, @model, @cwd, @repoId, @branch, @worktreePath,
-           @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error, @pinned)`
+           @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error,
+           @pinned, @workState, @linearIssueId, @notionPageId)`
       )
-      // better-sqlite3 rejects raw booleans, so coerce pinned to 0/1 at the boundary.
-      .run({ ...s, pinned: s.pinned ? 1 : 0 })
+      .run(bindSession(s))
   }
 
   update(id: string, patch: Partial<SessionInfo>): SessionInfo | null {
     const current = this.get(id)
     if (!current) return null
     const next: SessionInfo = { ...current, ...patch, id, updatedAt: Date.now() }
-    // NOTE: pinned is intentionally NOT in the SET list — it's owned by setPinned()
-    // and preserved across status/cost updates. Coerce it anyway so the (unbound)
-    // boolean can't reach the driver.
+    // Persistent work-state follows status, EXCEPT a stop preserves the prior
+    // state — so a paused/restarted active task stays resumable (Idle), not Done.
+    if (patch.status !== undefined && patch.status !== 'stopped') {
+      next.workState = deriveWorkState(patch.status)
+    }
+    // pinned stays owned by setPinned() — not in the SET list, just coerced safe.
     this.db
       .prepare(
         `UPDATE sessions SET sdk_session_id=@sdkSessionId, title=@title, model=@model, cwd=@cwd,
            repo_id=@repoId, branch=@branch, worktree_path=@worktreePath, status=@status,
            permission_mode=@permissionMode, preset_id=@presetId, total_cost_usd=@totalCostUsd,
-           num_turns=@numTurns, updated_at=@updatedAt, error=@error
+           num_turns=@numTurns, updated_at=@updatedAt, error=@error,
+           work_state=@workState, linear_issue_id=@linearIssueId, notion_page_id=@notionPageId
          WHERE id=@id`
       )
-      .run({ ...next, pinned: next.pinned ? 1 : 0 })
+      .run(bindSession(next))
     return next
   }
 
