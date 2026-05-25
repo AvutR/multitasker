@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isRevivableStatus } from '@shared/board'
 import { useStore } from '../store/store'
 import { formatCost, StatusDot } from './bits'
 import { Transcript } from './Transcript'
@@ -17,6 +18,7 @@ export function Workspace() {
   const selectedId = useStore((s) => s.selectedId)
   const session = useStore((s) => (selectedId ? s.sessions[selectedId] : undefined))
   const models = useStore((s) => s.models)
+  const resume = useStore((s) => s.resume)
   const [tab, setTab] = useState<Tab>('transcript')
 
   if (!session) {
@@ -42,18 +44,29 @@ export function Workspace() {
             <TrustBar sessionId={session.id} branch={session.branch} />
           </div>
         </div>
-        <div className="flex gap-1">
-          {TABS.map((t) => (
+        <div className="flex items-center gap-2">
+          {isRevivableStatus(session.status) && (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`rounded px-2.5 py-1 text-xs font-medium ${
-                tab === t.id ? 'bg-ink-600 text-white' : 'text-[#8a93a6] hover:bg-ink-700'
-              }`}
+              onClick={() => void resume(session.id)}
+              title="Resume — continue this session where it left off"
+              className="rounded border border-[#5bd4a4]/40 px-2.5 py-1 text-xs font-medium text-[#5bd4a4] hover:bg-[#5bd4a4]/10"
             >
-              {t.label}
+              ↻ Resume
             </button>
-          ))}
+          )}
+          <div className="flex gap-1">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`rounded px-2.5 py-1 text-xs font-medium ${
+                  tab === t.id ? 'bg-ink-600 text-white' : 'text-[#8a93a6] hover:bg-ink-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="min-h-0 flex-1">

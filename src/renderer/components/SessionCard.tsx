@@ -1,4 +1,5 @@
 import type { SessionInfo } from '@shared/types'
+import { isRevivableStatus } from '@shared/board'
 import { useStore } from '../store/store'
 import { Badge, formatCost, StatusDot } from './bits'
 
@@ -6,10 +7,17 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   const select = useStore((s) => s.select)
   const deleteSession = useStore((s) => s.deleteSession)
   const setPinned = useStore((s) => s.setPinned)
+  const resume = useStore((s) => s.resume)
   const presets = useStore((s) => s.presets)
   const presetName = presets.find((p) => p.id === session.presetId)?.name ?? session.presetId ?? ''
   const needsYou = session.status === 'error' || session.status === 'awaiting_plan_approval'
+  // A non-live session (Done-lane card) can be revived — resume continues its run.
+  const revivable = isRevivableStatus(session.status)
 
+  const onResume = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    void resume(session.id)
+  }
   const onPin = (e: React.MouseEvent) => {
     e.stopPropagation()
     void setPinned(session.id, !session.pinned)
@@ -49,6 +57,16 @@ export function SessionCard({ session }: { session: SessionInfo }) {
 
       {/* Hover actions — siblings of the select button (no nested buttons). */}
       <div className="absolute right-1.5 top-1.5 flex gap-0.5">
+        {revivable && (
+          <button
+            onClick={onResume}
+            title="Resume — continue this session"
+            aria-label="Resume session"
+            className="rounded px-1 text-[11px] leading-5 text-[#8a93a6] opacity-0 transition-opacity hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
+          >
+            ↻
+          </button>
+        )}
         <button
           onClick={onPin}
           title={session.pinned ? 'Unpin' : 'Pin to top'}
