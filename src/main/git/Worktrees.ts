@@ -43,8 +43,20 @@ export async function readRepoMeta(repoPath: string): Promise<RepoInfo> {
   }
 }
 
+/** True if `cwd` is inside a git work tree. Never throws (a missing/!repo dir
+ *  resolves false) so callers degrade gracefully instead of surfacing
+ *  simple-git's "failed to run git: fatal: not a git repository". */
+export async function isGitRepo(cwd: string): Promise<boolean> {
+  try {
+    return await simpleGit(cwd).checkIsRepo()
+  } catch {
+    return false
+  }
+}
+
 /** Working-tree diff against HEAD for review (feeds the Monaco DiffEditor). */
 export async function computeDiff(cwd: string): Promise<DiffFile[]> {
+  if (!(await isGitRepo(cwd))) return [] // session pointed at a non-repo dir — nothing to diff
   const git = simpleGit(cwd)
   const status = await git.status()
   const out: DiffFile[] = []
@@ -72,6 +84,7 @@ export async function computeDiff(cwd: string): Promise<DiffFile[]> {
 /** Stage everything in the (session-isolated) worktree and commit. Local only —
  *  never pushes (no-remote constraint). */
 export async function commitAll(cwd: string, message: string): Promise<CommitResult> {
+  if (!(await isGitRepo(cwd))) return { committed: false, reason: 'not a git repository' }
   const git = simpleGit(cwd)
   const status = await git.status()
   if (status.files.length === 0) return { committed: false, reason: 'nothing to commit — working tree clean' }
