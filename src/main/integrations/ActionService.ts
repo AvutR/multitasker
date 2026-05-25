@@ -70,6 +70,13 @@ export class ActionService {
 
   /** Path #1 — a semantic integration tool the agent invoked. We own execution. */
   async propose(input: ProposeInput): Promise<ActionRecord> {
+    // Idempotency: the lifecycle automation and the agent (prompted to keep
+    // trackers current) can both propose the SAME update — e.g. moving a Linear
+    // issue to "In Progress". Collapse an identical action that already fired or
+    // is awaiting approval within a short window so the connector isn't hit twice.
+    const dup = this.recentDuplicate(input.actionType, input.payload)
+    if (dup) return dup
+
     const decision = this.evaluate(input.actionType)
     if (!decision) {
       return this.record({
@@ -147,6 +154,21 @@ export class ActionService {
 
   // --- internals -----------------------------------------------------------
 
+  /** A recent identical action (same type + payload) that already fired or is
+   *  pending — returned so a duplicate propose() collapses onto it. Not matched
+   *  against dry_run, so flipping dry-run OFF still lets the action fire. */
+  private recentDuplicate(actionType: string, payload: unknown): ActionRecord | null {
+    const key = stableKey(payload)
+    const cutoff = Date.now() - DEDUP_WINDOW_MS
+    for (const a of this.repos.actions.list(50)) {
+      if (a.createdAt < cutoff) break // list() is created_at DESC — older rows can't match
+      if (a.actionType === actionType && (a.status === 'fired' || a.status === 'pending') && stableKey(a.payload) === key) {
+        return a
+      }
+    }
+    return null
+  }
+
   private evaluate(actionTypeId: string) {
     const def = ACTION_TYPE_BY_ID[actionTypeId]
     if (!def) return null
@@ -217,6 +239,25 @@ export class ActionService {
     if (!updated) throw new Error(`action vanished during update: ${id}`)
     this.bus.emit({ channel: 'action:updated', payload: updated })
     return updated
+  }
+}
+
+// Window for collapsing duplicate proposals (lifecycle + agent firing the same
+// update). Long enough to cover a transition's overlap, short enough that a
+// genuinely-repeated action later still goes through.
+const DEDUP_WINDOW_MS = 5 * 60_000
+
+/** Order-insensitive key for a payload so the same logical action dedupes even
+ *  if two callers built the object with different key order. */
+function stableKey(payload: unknown): string {
+  try {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const obj = payload as Record<string, unknown>
+      return JSON.stringify(Object.keys(obj).sort().map((k) => [k, obj[k]]))
+    }
+    return JSON.stringify(payload ?? null)
+  } catch {
+    return ''
   }
 }
 

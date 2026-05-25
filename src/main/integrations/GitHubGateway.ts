@@ -45,6 +45,9 @@ export class SimpleGitHubGateway implements ConnectorGateway {
     if (!p.cwd || !p.branch) return { ok: false, error: 'missing cwd/branch' }
     try {
       const git = simpleGit(p.cwd)
+      if (!(await git.checkIsRepo().catch(() => false))) {
+        return { ok: true, result: { skipped: 'not a git repository' } }
+      }
       const remotes = await git.getRemotes()
       if (!remotes.some((r) => r.name === 'origin')) {
         return { ok: true, result: { skipped: 'no origin remote — local branch only' } }
