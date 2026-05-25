@@ -174,7 +174,22 @@ export function classifyRawTool(
   if (n.includes('linear')) return isReadTool(n) ? null : routeLinear(n)
   if (n.includes('notion')) return isReadTool(n) ? null : pick('notion.page_update')
   if (n.includes('github')) return isReadTool(n) ? null : pick('github.pr_create')
+
+  // Linear is the odd connector out: it namespaces its MCP tools by an opaque
+  // server id and names them by noun (save_issue, save_status_update,
+  // list_issues), so the tool name carries NO "linear" token and the substring
+  // checks above miss it — a real policy bypass for raw Linear writes. Recognize
+  // it by its issue-tracker noun signature instead (reads still pass). Scoped to
+  // mcp__ tools so ordinary local tools are unaffected; Slack/Notion/GitHub are
+  // already matched by name above, so only an unrecognized connector reaches here.
+  if (looksLikeLinear(n)) return isReadTool(n) ? null : routeLinear(n)
   return null
+}
+
+const LINEAR_NOUNS = ['issue', 'cycle', 'initiative', 'milestone', 'status_update', 'project', 'comment', 'label']
+
+function looksLikeLinear(n: string): boolean {
+  return n.startsWith('mcp__') && LINEAR_NOUNS.some((noun) => n.includes(noun))
 }
 
 function routeLinear(n: string): RawToolClassification | null {
