@@ -255,6 +255,31 @@ describe('resume after stop uses a fresh queue', () => {
   })
 })
 
+describe('persistent workState + tracker link', () => {
+  it('workState follows status, but a stop preserves the prior state; link round-trips', () => {
+    const { repos } = deps()
+    const info = makeInfo(repos, { status: 'queued', workState: 'active', linearIssueId: 'ENG-9', notionPageId: 'pg-1' })
+    repos.sessions.update(info.id, { status: 'running' })
+    expect(repos.sessions.get(info.id)?.workState).toBe('active')
+    repos.sessions.update(info.id, { status: 'landed' })
+    expect(repos.sessions.get(info.id)?.workState).toBe('review')
+    // A stop (incl. reconcileOnStartup) must NOT reset workState — keeps it resumable/in-lane.
+    repos.sessions.update(info.id, { status: 'stopped' })
+    const s = repos.sessions.get(info.id)!
+    expect(s.status).toBe('stopped')
+    expect(s.workState).toBe('review')
+    expect(s.linearIssueId).toBe('ENG-9')
+    expect(s.notionPageId).toBe('pg-1')
+  })
+
+  it('an active session stopped on restart stays workState=active (resumable)', () => {
+    const { repos } = deps()
+    const info = makeInfo(repos, { status: 'running', workState: 'active' })
+    repos.sessions.update(info.id, { status: 'stopped' }) // simulate reconcileOnStartup
+    expect(repos.sessions.get(info.id)?.workState).toBe('active')
+  })
+})
+
 describe('SessionManager delete + pin', () => {
   const parkedRun = (args: { prompt: unknown; options: Record<string, unknown> }) =>
     (async function* () {

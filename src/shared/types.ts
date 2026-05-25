@@ -17,6 +17,14 @@ export type SessionStatus =
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions'
 
+/**
+ * Persistent work-state — *where the task is*, decoupled from whether the Claude
+ * subprocess is currently alive (which never survives a restart). The board
+ * groups by this, so a restart no longer collapses in-flight work into "stopped".
+ * Phase 2 will sync this from the linked tracker's status via a configurable map.
+ */
+export type WorkState = 'active' | 'review' | 'done'
+
 export interface SessionInfo {
   id: string // stable local UUID — primary key in DB and UI
   sdkSessionId: string | null // the SDK's own session_id (from the init message), used for resume/fork
@@ -36,6 +44,13 @@ export interface SessionInfo {
   error: string | null
   /** Pinned to the top of its Mission Control lane. Absent = not pinned. */
   pinned?: boolean
+  /** Persistent work-state (survives restart); the board groups by this. Absent
+   *  on pre-migration rows — derive from status via deriveWorkState() then. */
+  workState?: WorkState
+  /** Linked work items, persisted so the link survives a restart (the lifecycle
+   *  automation re-registers from these on startup). */
+  linearIssueId?: string | null
+  notionPageId?: string | null
 }
 
 // ---------------------------------------------------------------------------
