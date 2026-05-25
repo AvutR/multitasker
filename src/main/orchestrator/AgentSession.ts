@@ -43,6 +43,9 @@ export class AgentSession {
   private readonly gate: (toolName: string, input: Record<string, unknown>) => Promise<GateDecision>
   private planResolver: ((d: PlanDecision) => void) | null = null
   private donePromise: Promise<void> = Promise.resolve()
+  // Once disposed, all persistence/emits are silenced so a deleted session can't
+  // resurrect via a trailing event from its still-unwinding run loop.
+  private destroyed = false
 
   constructor(
     private readonly deps: SessionDeps,
@@ -103,6 +106,20 @@ export class AgentSession {
   /** Mark a /build session as landed once a verified local commit was made. */
   markLanded(): void {
     this.patch({ status: 'landed' })
+  }
+
+  /** Tear down for deletion: abort the subprocess and silence any late events. */
+  dispose(): void {
+    this.destroyed = true
+    this.abort.abort()
+    this.planResolver?.({ approved: false })
+    this.planResolver = null
+    this.queue.close()
+  }
+
+  /** Sync the pinned flag into the in-memory snapshot (the repo owns persistence). */
+  applyPinned(pinned: boolean): void {
+    this.info = { ...this.info, pinned }
   }
 
   // --- run loop ------------------------------------------------------------
@@ -197,6 +214,7 @@ export class AgentSession {
   // --- message routing -----------------------------------------------------
 
   private handle(msg: Record<string, unknown>): void {
+    if (this.destroyed) return
     switch (msg.type) {
       case 'system': {
         const patch: Partial<SessionInfo> = {}
@@ -254,6 +272,7 @@ export class AgentSession {
   }
 
   private patch(patch: Partial<SessionInfo>): void {
+    if (this.destroyed) return
     const updated = this.deps.repos.sessions.update(this.info.id, patch)
     this.info = updated ?? { ...this.info, ...patch, updatedAt: Date.now() }
     this.deps.bus.emit({ channel: 'session:updated', payload: this.info })

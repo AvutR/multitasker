@@ -77,5 +77,9 @@ export const MIGRATIONS: Migration[] = [
         added_at       INTEGER NOT NULL
       );
     `
+  },
+  {
+    name: '0002_session_pinned',
+    sql: `ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;`
   }
 ]

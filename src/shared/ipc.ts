@@ -34,6 +34,8 @@ export interface IpcApi {
   'session:fork': (id: string) => SessionInfo
   'session:approvePlan': (args: { id: string; approved: boolean; feedback?: string }) => void
   'session:reclaimIdle': () => number
+  'session:delete': (id: string) => void
+  'session:setPinned': (args: { id: string; pinned: boolean }) => SessionInfo
 
   // Code traversal / review (scoped to a session's cwd/worktree)
   'fs:readDir': (args: { sessionId: string; relPath: string }) => FileEntry[]
@@ -72,6 +74,7 @@ export type IpcResult<C extends IpcChannel> = ReturnType<IpcApi[C]>
 /** Main -> Renderer streaming events (multiplexed over 'app:event'). */
 export type IpcEvent =
   | { channel: 'session:updated'; payload: SessionInfo }
+  | { channel: 'session:deleted'; payload: { id: string } }
   | { channel: 'session:message'; payload: TranscriptMessage }
   | { channel: 'session:delta'; payload: { sessionId: string; text: string } }
   | { channel: 'session:planRequest'; payload: PlanApprovalRequest }

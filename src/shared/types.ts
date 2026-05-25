@@ -34,6 +34,8 @@ export interface SessionInfo {
   createdAt: number
   updatedAt: number
   error: string | null
+  /** Pinned to the top of its Mission Control lane. Absent = not pinned. */
+  pinned?: boolean
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,7 @@ interface SessionRow {
   created_at: number
   updated_at: number
   error: string | null
+  pinned: number
 }
 
 interface MessageRow {
@@ -80,7 +81,8 @@ function toSession(r: SessionRow): SessionInfo {
     numTurns: r.num_turns,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-    error: r.error
+    error: r.error,
+    pinned: r.pinned === 1
   }
 }
 
@@ -123,17 +125,21 @@ export class SessionRepo {
     this.db
       .prepare(
         `INSERT INTO sessions (id, sdk_session_id, title, model, cwd, repo_id, branch, worktree_path,
-           status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error)
+           status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error, pinned)
          VALUES (@id, @sdkSessionId, @title, @model, @cwd, @repoId, @branch, @worktreePath,
-           @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error)`
+           @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error, @pinned)`
       )
-      .run(s)
+      // better-sqlite3 rejects raw booleans, so coerce pinned to 0/1 at the boundary.
+      .run({ ...s, pinned: s.pinned ? 1 : 0 })
   }
 
   update(id: string, patch: Partial<SessionInfo>): SessionInfo | null {
     const current = this.get(id)
     if (!current) return null
     const next: SessionInfo = { ...current, ...patch, id, updatedAt: Date.now() }
+    // NOTE: pinned is intentionally NOT in the SET list — it's owned by setPinned()
+    // and preserved across status/cost updates. Coerce it anyway so the (unbound)
+    // boolean can't reach the driver.
     this.db
       .prepare(
         `UPDATE sessions SET sdk_session_id=@sdkSessionId, title=@title, model=@model, cwd=@cwd,
@@ -142,8 +148,21 @@ export class SessionRepo {
            num_turns=@numTurns, updated_at=@updatedAt, error=@error
          WHERE id=@id`
       )
-      .run(next)
+      .run({ ...next, pinned: next.pinned ? 1 : 0 })
     return next
+  }
+
+  /** Pin/unpin a session (owns the pinned column; targeted UPDATE). */
+  setPinned(id: string, pinned: boolean): SessionInfo | null {
+    this.db
+      .prepare('UPDATE sessions SET pinned = ?, updated_at = ? WHERE id = ?')
+      .run(pinned ? 1 : 0, Date.now(), id)
+    return this.get(id)
+  }
+
+  /** Hard-delete a session row. Transcript + audit rows are removed by the caller. */
+  delete(id: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id)
   }
 
   get(id: string): SessionInfo | null {
@@ -182,6 +201,10 @@ export class MessageRepo {
       .prepare('SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC')
       .all(sessionId) as MessageRow[]
     return rows.map(toMessage)
+  }
+
+  deleteBySession(sessionId: string): void {
+    this.db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId)
   }
 }
 
@@ -241,6 +264,10 @@ export class ActionRepo {
       .prepare('SELECT * FROM actions ORDER BY created_at DESC LIMIT ?')
       .all(limit) as ActionRow[]
     return rows.map(toAction)
+  }
+
+  deleteBySession(sessionId: string): void {
+    this.db.prepare('DELETE FROM actions WHERE session_id = ?').run(sessionId)
   }
 }
 
