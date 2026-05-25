@@ -75,12 +75,10 @@ describe('ActionService.propose (path #1 — Multitasker owns execution)', () =>
     expect(gateway.calls).toHaveLength(0)
   })
 
-  it('disabled action types drop even when forced AUTO with dry-run off', async () => {
-    const { svc, repos, gateway } = setup(false)
-    repos.policies.setMode('github.pr_create', 'auto')
-    const rec = await svc.propose({ ...base, actionType: 'github.pr_create' })
-    expect(rec.status).toBe('dropped')
-    expect(rec.decidedBy).toBe('policy_disabled')
+  it('github.pr_create is enabled and gated — queues under APPROVE instead of dropping', async () => {
+    const { svc, gateway } = setup(false)
+    const rec = await svc.propose({ ...base, actionType: 'github.pr_create', payload: { title: 'PR' } })
+    expect(rec.status).toBe('pending') // enabled + default APPROVE → queued (was 'dropped' when disabled)
     expect(gateway.calls).toHaveLength(0)
   })
 
@@ -162,6 +160,34 @@ describe('github actions route to the git gateway', () => {
     })
     expect(rec.status).toBe('fired')
     expect(git.calls).toHaveLength(1)
+    expect(connector.calls).toHaveLength(0)
+  })
+
+  it('github.pr_create queues, then fires via the git gateway with the session cwd injected', async () => {
+    const db = openDatabase(':memory:')
+    const repos = createRepositories(db)
+    seedDefaultPolicies(repos)
+    repos.settings.set({ dryRun: false })
+    repos.sessions.insert({
+      id: 'sx', sdkSessionId: null, title: 't', model: null, cwd: '/repo', repoId: null, branch: 'b',
+      worktreePath: null, status: 'running', permissionMode: 'default', presetId: null,
+      totalCostUsd: 0, numTurns: 0, createdAt: 0, updatedAt: 0, error: null
+    })
+    const bus = new EventBus()
+    const connector = new FakeGateway()
+    const git = new FakeGateway()
+    const svc = new ActionService(repos, bus, connector, git)
+
+    const queued = await svc.propose({ sessionId: 'sx', actionType: 'github.pr_create', summary: 'PR', payload: { title: 'My PR', body: 'b' } })
+    expect(queued.status).toBe('pending') // default APPROVE
+    expect(git.calls).toHaveLength(0)
+
+    const fired = await svc.decide(queued.id, true)
+    expect(fired.status).toBe('fired')
+    expect(git.calls).toHaveLength(1)
+    expect(git.calls[0].actionType).toBe('github.pr_create')
+    expect((git.calls[0].payload as { cwd?: string }).cwd).toBe('/repo') // session cwd injected
+    expect((git.calls[0].payload as { title?: string }).title).toBe('My PR')
     expect(connector.calls).toHaveLength(0)
   })
 })

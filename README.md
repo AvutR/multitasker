@@ -19,7 +19,7 @@ One place to drive a dozen parallel workstreams, keep your issue tracker and spe
 - **Model selection + multiple providers.** Pick the model per session in the New Session modal. Anthropic Claude models run natively; Bedrock/Vertex run Claude on those clouds; and an Anthropic-compatible **gateway** (LiteLLM / OpenRouter, configured in settings) routes to other providers (GPT, Gemini). Each model carries the right env to the spawned Claude Code subprocess — see [`models.ts`](src/main/models.ts).
 - **Editor / review layer.** A Monaco-based file tree + editor (the "Copilot feel"), a side-by-side **diff review**, a live streaming transcript per agent, and an **inline plan-approval gate**.
 - **Policy-gated integrations.** A typed taxonomy of every external action (`linear.status_update`, `slack.standup_post`, `notion.spec_update`, …), each independently set to **AUTO / one-click APPROVE / OFF**, plus a **global dry-run** master switch. Internal bookkeeping (Linear/Notion) defaults AUTO; outward posts (Slack) default APPROVE. Every action is written to an append-only **audit log**.
-- **Local-commit landing.** No remote / no PR in this build — the in-app "Commit" lands a verified local commit on the session's worktree branch.
+- **Local-commit landing + optional PRs.** The in-app "Commit" lands a verified local commit on the session's worktree branch. Pushing the branch and opening/commenting on a PR are available as **policy-gated** GitHub actions (`github.push_branch`, `github.pr_create`, `github.pr_comment`) — gated to one-click approval by default, suppressed under dry-run.
 
 ## Quickstart
 
@@ -123,7 +123,7 @@ Add your own via `~/.multitasker/workflows.json` — see [Importing workflows](#
 
 ## Known limitations / follow-ups
 
-- **GitHub PR actions are disabled** (the no-remote constraint) — the plumbing exists, flip them on when remotes are in scope.
+- **GitHub PR actions** (`github.pr_create` / `github.pr_comment`) shell out to `gh` and are **gated to one-click approval by default** (suppressed under dry-run). They run scoped to the session repo; `gh` must be installed and authenticated.
 - The connector execution worker allows only MCP connector tools (never shell/fs) with name-based containment of other *named* connectors (LOW): unidentified MCP servers aren't excluded, and it isn't yet bound to the single approved *tool*. Scope it to the connector's MCP server id as a follow-up.
 - Idle-but-live sessions hold a concurrency slot until stopped (the subprocess is alive); the cap gates **resident** sessions.
 - Deferred: browser/remote mode, multi-user/RBAC, cross-session orchestration graphs, worktree auto-merge, app signing/notarization, an `xterm` terminal panel, a cost dashboard.

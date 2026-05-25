@@ -98,6 +98,25 @@ export function createIntegrationMcpServer(actionService: ActionService, session
           content: z.string()
         },
         async (args) => propose('notion.page_update', `Notion page · ${args.pageId}`, args)
+      ),
+      tool(
+        'open_pr',
+        'Open a GitHub pull request for the current session branch. Routes through the policy engine (defaults to one-click approval); runs in the session repo.',
+        {
+          title: z.string().describe('PR title'),
+          body: z.string().optional().describe('PR body (markdown)'),
+          base: z.string().optional().describe('Base branch to merge into; omit for the repo default')
+        },
+        async (args) => propose('github.pr_create', `Open PR · ${args.title}`, args)
+      ),
+      tool(
+        'comment_on_pr',
+        'Comment on a GitHub pull request. Routes through the policy engine.',
+        {
+          body: z.string().describe('Comment body (markdown)'),
+          pr: z.string().optional().describe('PR number/URL/branch; omit to target the current branch’s PR')
+        },
+        async (args) => propose('github.pr_comment', 'PR comment', args)
       )
     ]
   })
