@@ -81,5 +81,13 @@ export const MIGRATIONS: Migration[] = [
   {
     name: '0002_session_pinned',
     sql: `ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;`
+  },
+  {
+    name: '0003_session_workstate_links',
+    sql: `
+      ALTER TABLE sessions ADD COLUMN work_state      TEXT;
+      ALTER TABLE sessions ADD COLUMN linear_issue_id TEXT;
+      ALTER TABLE sessions ADD COLUMN notion_page_id  TEXT;
+    `
   }
 ]

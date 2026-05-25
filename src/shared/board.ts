@@ -1,8 +1,18 @@
-import type { ActionRecord, BoardGroup, NeedsYouItem, PlanApprovalRequest, SessionInfo } from './types'
+import type { ActionRecord, BoardGroup, NeedsYouItem, PlanApprovalRequest, SessionInfo, WorkState } from './types'
 
 /** A non-live session (its subprocess is gone) that resume() can re-run. */
 export function isRevivableStatus(status: SessionInfo['status']): boolean {
   return status === 'stopped' || status === 'error' || status === 'completed' || status === 'landed'
+}
+
+/** Persistent work-state implied by a runtime status. Used to seed/refresh
+ *  workState; 'stopped' is intentionally absent (a stop preserves the prior
+ *  work-state) — callers fall back here only when workState is unknown. */
+export function deriveWorkState(status: SessionInfo['status']): WorkState {
+  if (status === 'completed') return 'done'
+  if (status === 'landed') return 'review'
+  if (status === 'stopped') return 'done' // unknown prior (e.g. pre-migration row) → treat as terminal
+  return 'active' // queued / running / awaiting_input / awaiting_plan_approval / error
 }
 
 // Kind dominates the rank (error > plan > action); wait-time only breaks ties
@@ -52,7 +62,13 @@ export function groupSessions(sessions: SessionInfo[]): Record<BoardGroup, Sessi
     if (s.status === 'error' || s.status === 'awaiting_plan_approval') groups.needs_you.push(s)
     else if (s.status === 'running' || s.status === 'queued') groups.running.push(s)
     else if (s.status === 'awaiting_input') groups.idle.push(s)
-    else groups.done.push(s) // landed, completed, stopped
+    else if (s.status === 'stopped') {
+      // A stopped session is grouped by its PERSISTENT work-state: work that was
+      // still active (incl. everything paused by an app restart) stays in Idle —
+      // visible and resumable — instead of being buried in the (collapsed) Done lane.
+      const ws = s.workState ?? deriveWorkState(s.status)
+      ;(ws === 'active' ? groups.idle : groups.done).push(s)
+    } else groups.done.push(s) // landed, completed
   }
   for (const lane of Object.values(groups)) {
     lane.sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
