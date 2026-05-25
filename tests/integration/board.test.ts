@@ -92,6 +92,18 @@ describe('groupSessions', () => {
     expect(g.idle.map((s) => s.id)).toEqual(['5'])
     expect(g.done.map((s) => s.id)).toEqual(['6', '7', '8'])
   })
+
+  it('floats pinned sessions to the top of their lane, preserving order otherwise', () => {
+    const g = groupSessions([
+      session({ id: 'r1', status: 'running' }),
+      session({ id: 'r2', status: 'running', pinned: true }),
+      session({ id: 'r3', status: 'running' }),
+      session({ id: 'd1', status: 'completed' }),
+      session({ id: 'd2', status: 'stopped', pinned: true })
+    ])
+    expect(g.running.map((s) => s.id)).toEqual(['r2', 'r1', 'r3']) // pinned first; r1/r3 order kept (stable)
+    expect(g.done.map((s) => s.id)).toEqual(['d2', 'd1'])
+  })
 })
 
 describe('idleSessionIds', () => {

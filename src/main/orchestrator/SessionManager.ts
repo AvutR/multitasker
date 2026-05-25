@@ -146,6 +146,33 @@ export class SessionManager {
     this.sessions.get(id)?.markLanded()
   }
 
+  /** Remove a session entirely: stop its subprocess, free its slot, and
+   *  hard-delete its row, transcript, and audit entries. */
+  delete(id: string): void {
+    const session = this.sessions.get(id)
+    if (session) {
+      session.dispose() // aborts the run loop; whenDone() then frees the active slot
+      this.sessions.delete(id)
+    }
+    // If it was still waiting on the cap, drop it from the queue too.
+    const idx = this.pending.findIndex((p) => p.session.id === id)
+    if (idx >= 0) this.pending.splice(idx, 1)
+    this.repos.messages.deleteBySession(id)
+    this.repos.actions.deleteBySession(id)
+    this.repos.sessions.delete(id)
+    this.bus.emit({ channel: 'session:deleted', payload: { id } })
+  }
+
+  /** Pin/unpin a session to the top of its Mission Control lane. */
+  setPinned(id: string, pinned: boolean): SessionInfo {
+    const updated = this.repos.sessions.setPinned(id, pinned)
+    if (!updated) throw new Error(`session not found: ${id}`)
+    this.sessions.get(id)?.applyPinned(pinned) // keep the live snapshot in sync
+    const info = this.sessions.get(id)?.snapshot() ?? updated
+    this.bus.emit({ channel: 'session:updated', payload: info })
+    return info
+  }
+
   /** Stop idle (awaiting_input) sessions to free their held concurrency slots. */
   reclaimIdle(): number {
     const ids = idleSessionIds(this.list())
