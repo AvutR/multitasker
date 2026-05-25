@@ -158,11 +158,19 @@ export class ActionService {
   private async execute(rec: ActionRecord, decidedBy: ActionDecidedBy): Promise<ActionRecord> {
     const def = ACTION_TYPE_BY_ID[rec.actionType]
     const gateway = def.connector === 'github' ? this.gitGateway : this.gateway
+    // GitHub actions run gh/git in the session's worktree, so supply its cwd.
+    // The payload still wins (e.g. push_branch passes the worktree path explicitly).
+    let payload = rec.payload
+    if (def.connector === 'github' && rec.sessionId) {
+      const session = this.repos.sessions.get(rec.sessionId)
+      const base = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+      if (session) payload = { cwd: session.cwd, ...base }
+    }
     try {
       const res = await gateway.execute({
         actionType: rec.actionType,
         connector: def.connector,
-        payload: rec.payload,
+        payload,
         summary: rec.summary
       })
       return this.update(rec.id, {

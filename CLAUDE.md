@@ -8,7 +8,7 @@ Electron + TypeScript desktop app: a parallel Claude Code agent orchestrator wit
 - **The Agent SDK is the one untyped edge.** `@anthropic-ai/claude-agent-sdk` message/option types drift across versions, so `AgentSession` binds `query` to a minimal local signature and `sdkMapping.ts` narrows raw messages into strict `ContentBlock`s. Keep SDK-shaped `any`/`Record<string,unknown>` confined to those boundaries; everything inward is strictly typed.
 - **The policy invariant is sacred:** every outward action goes through `ActionService` → `PolicyEngine.decide`. Two enforcement paths — the in-process semantic MCP tools (`integrationMcpServer.ts`, path #1) and the `canUseTool` connector guard (`guards.ts` + `classifyRawTool`, path #2, default-deny). If you add a connector action, add it to `actionTypes.ts` and keep the guard fail-safe.
 - **Skills by default:** sessions are spawned with `settingSources: ['user','project','local']` and a system-prompt append (see `skills/launchPresets.ts`) that tells agents to prefer installed skills.
-- **Local commits only** in this build — no remote, no PR. GitHub PR action types ship disabled.
+- **Landing is a local commit**; pushing branches and opening/commenting on PRs are **policy-gated** GitHub actions (`github.push_branch` / `pr_create` / `pr_comment`), executed via `gh`/git and defaulting to one-click approval (suppressed under dry-run).
 
 ## Conventions
 
