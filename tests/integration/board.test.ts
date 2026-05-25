@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionRecord, PlanApprovalRequest, SessionInfo } from '@shared/types'
-import { groupSessions, idleSessionIds, rankNeedsYou } from '../../src/shared/board'
+import { groupSessions, idleSessionIds, isRevivableStatus, rankNeedsYou } from '../../src/shared/board'
 
 function session(over: Partial<SessionInfo>): SessionInfo {
   return {
@@ -103,6 +103,15 @@ describe('groupSessions', () => {
     ])
     expect(g.running.map((s) => s.id)).toEqual(['r2', 'r1', 'r3']) // pinned first; r1/r3 order kept (stable)
     expect(g.done.map((s) => s.id)).toEqual(['d2', 'd1'])
+  })
+})
+
+describe('isRevivableStatus', () => {
+  it('is true for non-live sessions (resume can re-run them)', () => {
+    for (const s of ['stopped', 'error', 'completed', 'landed'] as const) expect(isRevivableStatus(s)).toBe(true)
+  })
+  it('is false for live sessions', () => {
+    for (const s of ['queued', 'running', 'awaiting_input', 'awaiting_plan_approval'] as const) expect(isRevivableStatus(s)).toBe(false)
   })
 })
 
