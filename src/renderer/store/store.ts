@@ -46,6 +46,8 @@ interface State {
   stop: (id: string) => Promise<void>
   resume: (id: string) => Promise<void>
   fork: (id: string) => Promise<void>
+  deleteSession: (id: string) => Promise<void>
+  setPinned: (id: string, pinned: boolean) => Promise<void>
   approvePlan: (id: string, approved: boolean, feedback?: string) => Promise<void>
   setPolicyMode: (actionType: string, mode: PolicyMode) => Promise<void>
   setDryRun: (dryRun: boolean) => Promise<void>
@@ -150,6 +152,14 @@ export const useStore = create<State>((set, get) => ({
       return { sessions, order: byNewest(sessions), selectedId: info.id, view: 'session' as const }
     })
   },
+  deleteSession: async (id) => {
+    // The session:deleted event does the store removal (single source of truth).
+    await window.api.invoke('session:delete', id)
+  },
+  setPinned: async (id, pinned) => {
+    const info = await window.api.invoke('session:setPinned', { id, pinned })
+    set((st) => ({ sessions: { ...st.sessions, [id]: info } }))
+  },
   approvePlan: async (id, approved, feedback) => {
     await window.api.invoke('session:approvePlan', { id, approved, feedback })
     set((st) => {
@@ -222,6 +232,32 @@ function applyEvent(
       set((st) => {
         const sessions = { ...st.sessions, [s.id]: s }
         return { sessions, order: byNewest(sessions) }
+      })
+      break
+    }
+    case 'session:deleted': {
+      const { id } = evt.payload
+      set((st) => {
+        const sessions = { ...st.sessions }
+        delete sessions[id]
+        const messages = { ...st.messages }
+        delete messages[id]
+        const deltas = { ...st.deltas }
+        delete deltas[id]
+        const planRequests = { ...st.planRequests }
+        delete planRequests[id]
+        const next: Partial<State> = {
+          sessions,
+          order: st.order.filter((x) => x !== id),
+          messages,
+          deltas,
+          planRequests
+        }
+        if (st.selectedId === id) {
+          next.selectedId = null
+          next.view = 'board'
+        }
+        return next
       })
       break
     }

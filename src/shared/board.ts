@@ -39,7 +39,8 @@ export function rankNeedsYou(
   return items.sort((a, b) => b.priority - a.priority)
 }
 
-/** Group sessions into the four Mission Control lanes. */
+/** Group sessions into the four Mission Control lanes; pinned float to the top
+ *  of each lane (V8's sort is stable, so order is otherwise preserved). */
 export function groupSessions(sessions: SessionInfo[]): Record<BoardGroup, SessionInfo[]> {
   const groups: Record<BoardGroup, SessionInfo[]> = { needs_you: [], running: [], idle: [], done: [] }
   for (const s of sessions) {
@@ -47,6 +48,9 @@ export function groupSessions(sessions: SessionInfo[]): Record<BoardGroup, Sessi
     else if (s.status === 'running' || s.status === 'queued') groups.running.push(s)
     else if (s.status === 'awaiting_input') groups.idle.push(s)
     else groups.done.push(s) // landed, completed, stopped
+  }
+  for (const lane of Object.values(groups)) {
+    lane.sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
   }
   return groups
 }

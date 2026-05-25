@@ -255,6 +255,68 @@ describe('resume after stop uses a fresh queue', () => {
   })
 })
 
+describe('SessionManager delete + pin', () => {
+  const parkedRun = (args: { prompt: unknown; options: Record<string, unknown> }) =>
+    (async function* () {
+      yield { type: 'system', session_id: randomUUID() }
+      yield { type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } }
+      await new Promise<void>((resolve) => {
+        const signal = (args.options.abortController as AbortController | undefined)?.signal
+        if (!signal || signal.aborted) resolve()
+        else signal.addEventListener('abort', () => resolve(), { once: true })
+      })
+    })()
+
+  it('deletes a running session: frees the slot, removes rows, emits session:deleted, no late events', async () => {
+    const { repos, bus, actions, events } = deps()
+    repos.settings.set({ concurrencyCap: 1 })
+    h.queryImpl = parkedRun
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const a = await manager.spawn({ prompt: 'A', cwd: '/tmp/x', presetId: 'explore' })
+    const b = await manager.spawn({ prompt: 'B', cwd: '/tmp/x', presetId: 'explore' })
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === a.id)?.status).toBe('running'))
+    await vi.waitFor(() => expect(repos.messages.listBySession(a.id).length).toBeGreaterThan(0))
+
+    manager.delete(a.id)
+
+    expect(repos.sessions.get(a.id)).toBeNull()
+    expect(repos.messages.listBySession(a.id)).toEqual([])
+    expect(manager.list().some((s) => s.id === a.id)).toBe(false)
+    const deletedIdx = events.findIndex((e) => e.channel === 'session:deleted' && (e.payload as { id: string }).id === a.id)
+    expect(deletedIdx).toBeGreaterThanOrEqual(0)
+    // a's slot is freed, so the queued b starts running.
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === b.id)?.status).toBe('running'))
+    // The aborted run loop must NOT resurrect `a` via a trailing session:updated.
+    await new Promise((r) => setTimeout(r, 30))
+    const lateUpdate = events
+      .slice(deletedIdx + 1)
+      .some((e) => e.channel === 'session:updated' && (e.payload as SessionInfo).id === a.id)
+    expect(lateUpdate).toBe(false)
+  })
+
+  it('pins a session: persists, reflects in list(), and emits session:updated', async () => {
+    const { repos, bus, actions, events } = deps()
+    h.queryImpl = () =>
+      (async function* () {
+        yield { type: 'system', session_id: 'sdk-pin' }
+        yield { type: 'result', subtype: 'success', total_cost_usd: 0 }
+      })()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const a = await manager.spawn({ prompt: 'A', cwd: '/tmp/x', presetId: 'explore' })
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === a.id)?.status).toBe('completed'))
+
+    const before = events.length
+    const updated = manager.setPinned(a.id, true)
+    expect(updated.pinned).toBe(true)
+    expect(repos.sessions.get(a.id)?.pinned).toBe(true)
+    expect(manager.list().find((s) => s.id === a.id)?.pinned).toBe(true) // live snapshot synced
+    expect(events.slice(before).some((e) => e.channel === 'session:updated' && (e.payload as SessionInfo).pinned === true)).toBe(true)
+
+    manager.setPinned(a.id, false)
+    expect(repos.sessions.get(a.id)?.pinned).toBe(false)
+  })
+})
+
 describe('integration MCP server wiring', () => {
   it('passes the SDK MCP server config through without double-wrapping', async () => {
     const { repos, bus, actions } = deps()
