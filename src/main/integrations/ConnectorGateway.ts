@@ -37,17 +37,24 @@ export class SdkConnectorGateway implements ConnectorGateway {
         options: {
           settingSources: ['user', 'project', 'local'],
           pathToClaudeCodeExecutable: claudeExecutablePath(),
-          // NOT bypassPermissions: this worker is scoped to ONLY the target
-          // connector's tools. canUseTool denies Bash, Edit, and every other
-          // connector, so a malicious/injected payload can't escalate beyond
-          // the single approved action that already passed the policy.
+          // NOT bypassPermissions: this worker may ONLY call MCP connector
+          // tools (never shell/fs/local tools like Bash/Edit/Read), and never a
+          // different *named* connector — so an injected payload can't escalate
+          // beyond the single approved action that already passed the policy.
+          // Match by MCP namespace, NOT the connector word: some connectors
+          // (e.g. Linear) name their tools `save_issue` / `list_issues` with no
+          // "linear" token, so a substring check denied every tool and the run
+          // burned its turns to error_max_turns.
           permissionMode: 'default',
-          maxTurns: 2,
+          // A single action often needs a lookup turn (resolve an id) before the
+          // write, plus a final summary turn — 2 was too few and tripped
+          // error_max_turns even when the right tool was allowed.
+          maxTurns: 8,
           canUseTool: async (toolName: string, toolInput: Record<string, unknown>) => {
-            if (toolName.toLowerCase().includes(connector)) {
+            if (isConnectorToolAllowed(toolName, connector)) {
               return { behavior: 'allow', updatedInput: toolInput }
             }
-            return { behavior: 'deny', message: `execution worker may only call ${connector} tools` }
+            return { behavior: 'deny', message: `execution worker may only call ${connector} connector tools` }
           },
           systemPrompt: {
             type: 'preset',
@@ -72,6 +79,33 @@ export class SdkConnectorGateway implements ConnectorGateway {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   }
+}
+
+// Connectors whose MCP tool names embed their own name, so we can recognize a
+// *different* connector's tool and refuse it. Linear is intentionally absent:
+// its tools (save_issue, list_issues, save_status_update, …) carry no "linear"
+// token, so it can't be excluded by name — only the named connectors below are
+// used for cross-connector containment.
+const NAMED_CONNECTOR_HINTS: Record<string, string[]> = {
+  slack: ['slack'],
+  notion: ['notion'],
+  github: ['github']
+}
+
+/**
+ * Permission rule for the single-action execution worker. Allows ONLY MCP
+ * connector tools (anything not `mcp__`-prefixed — Bash, Edit, Read, … — is an
+ * escalation path and stays denied), and refuses tools that clearly belong to a
+ * *different* named connector. Pure + exported so the rule is unit-tested
+ * without spawning a subprocess.
+ */
+export function isConnectorToolAllowed(toolName: string, connector: string): boolean {
+  const n = toolName.toLowerCase()
+  if (!n.startsWith('mcp__')) return false // shell/fs/local tools never allowed
+  for (const [other, hints] of Object.entries(NAMED_CONNECTOR_HINTS)) {
+    if (other !== connector && hints.some((h) => n.includes(h))) return false
+  }
+  return true
 }
 
 function buildPrompt(input: ConnectorExecuteInput): string {
