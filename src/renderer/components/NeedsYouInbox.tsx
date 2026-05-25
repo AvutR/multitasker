@@ -12,9 +12,16 @@ export function NeedsYouInbox() {
   const select = useStore((s) => s.select)
   const approvePlan = useStore((s) => s.approvePlan)
   const decideAction = useStore((s) => s.decideAction)
+  const deleteSession = useStore((s) => s.deleteSession)
 
   const items = rankNeedsYou(Object.values(sessions), Object.values(planRequests), actions)
   const running = Object.values(sessions).filter((s) => s.status === 'running').length
+
+  const onDelete = (sessionId: string, title: string) => {
+    if (window.confirm(`Delete "${title}"?\nThis stops the agent and removes it from the board. This can't be undone.`)) {
+      void deleteSession(sessionId)
+    }
+  }
 
   if (items.length === 0) {
     return (
@@ -52,6 +59,9 @@ export function NeedsYouInbox() {
                 <button onClick={() => void approvePlan(item.sessionId, true)} className="rounded bg-[#5bd4a4] px-2 py-1 text-[11px] font-semibold text-ink-900">
                   Approve
                 </button>
+                <button onClick={() => onDelete(item.sessionId, item.title)} title="Delete session" aria-label="Delete session" className="rounded px-2 py-1 text-[11px] text-[#8a93a6] hover:bg-[#f06d6d]/10 hover:text-[#f06d6d]">
+                  ✕
+                </button>
               </>
             )}
             {item.kind === 'action' && item.actionId && (
@@ -65,9 +75,14 @@ export function NeedsYouInbox() {
               </>
             )}
             {item.kind === 'error' && (
-              <button onClick={() => void select(item.sessionId)} className="rounded border border-ink-500 px-2 py-1 text-[11px] text-[#b9c0cc] hover:bg-ink-700">
-                Open
-              </button>
+              <>
+                <button onClick={() => void select(item.sessionId)} className="rounded border border-ink-500 px-2 py-1 text-[11px] text-[#b9c0cc] hover:bg-ink-700">
+                  Open
+                </button>
+                <button onClick={() => onDelete(item.sessionId, item.title)} title="Delete session" aria-label="Delete session" className="rounded px-2 py-1 text-[11px] text-[#8a93a6] hover:bg-[#f06d6d]/10 hover:text-[#f06d6d]">
+                  Delete
+                </button>
+              </>
             )}
           </div>
         </div>

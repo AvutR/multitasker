@@ -191,3 +191,35 @@ describe('github actions route to the git gateway', () => {
     expect(connector.calls).toHaveLength(0)
   })
 })
+
+describe('ActionService.propose idempotency (dedup duplicate updates)', () => {
+  it('collapses an identical action that already fired — connector hit once (key order-insensitive)', async () => {
+    const { svc, gateway } = setup(false) // dry-run off → AUTO fires
+    const first = await svc.propose({ sessionId: 's', actionType: 'linear.status_update', summary: 'In Progress', payload: { issueId: 'ENG-1', status: 'In Progress' } })
+    expect(first.status).toBe('fired')
+    // Same logical payload, different key order (lifecycle vs agent build it differently).
+    const second = await svc.propose({ sessionId: 's', actionType: 'linear.status_update', summary: 'again', payload: { status: 'In Progress', issueId: 'ENG-1' } })
+    expect(second.id).toBe(first.id) // deduped → same record
+    expect(gateway.calls).toHaveLength(1) // connector hit once, not twice
+    expect(svc.list()).toHaveLength(1)
+  })
+
+  it('does not dedup a different payload', async () => {
+    const { svc, gateway } = setup(false)
+    await svc.propose({ sessionId: 's', actionType: 'linear.status_update', summary: 'a', payload: { issueId: 'ENG-1', status: 'In Progress' } })
+    await svc.propose({ sessionId: 's', actionType: 'linear.status_update', summary: 'b', payload: { issueId: 'ENG-1', status: 'In Review' } })
+    expect(gateway.calls).toHaveLength(2)
+    expect(svc.list()).toHaveLength(2)
+  })
+
+  it('a failed action is not deduped — a retry goes through', async () => {
+    const { svc, gateway } = setup(false)
+    gateway.result = { ok: false, error: 'boom' }
+    const first = await svc.propose({ sessionId: 's', actionType: 'linear.status_update', summary: 'x', payload: { issueId: 'ENG-2', status: 'Done' } })
+    expect(first.status).toBe('failed')
+    gateway.result = { ok: true, result: {} }
+    const retry = await svc.propose({ sessionId: 's', actionType: 'linear.status_update', summary: 'x', payload: { issueId: 'ENG-2', status: 'Done' } })
+    expect(retry.id).not.toBe(first.id) // failed → not a dedup target → retried
+    expect(retry.status).toBe('fired')
+  })
+})
