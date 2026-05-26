@@ -8,15 +8,22 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   const deleteSession = useStore((s) => s.deleteSession)
   const setPinned = useStore((s) => s.setPinned)
   const resume = useStore((s) => s.resume)
+  const markDone = useStore((s) => s.markDone)
   const presets = useStore((s) => s.presets)
   const presetName = presets.find((p) => p.id === session.presetId)?.name ?? session.presetId ?? ''
   const needsYou = session.status === 'error' || session.status === 'awaiting_plan_approval'
   // A non-live session (Done-lane card) can be revived — resume continues its run.
   const revivable = isRevivableStatus(session.status)
+  // A live session (running/queued/idle) can be closed out as done.
+  const canMarkDone = session.status === 'running' || session.status === 'queued' || session.status === 'awaiting_input'
 
   const onResume = (e: React.MouseEvent) => {
     e.stopPropagation()
     void resume(session.id)
+  }
+  const onMarkDone = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    void markDone(session.id)
   }
   const onPin = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -65,6 +72,16 @@ export function SessionCard({ session }: { session: SessionInfo }) {
             className="rounded px-1 text-[11px] leading-5 text-[#8a93a6] opacity-0 transition-opacity hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
           >
             ↻
+          </button>
+        )}
+        {canMarkDone && (
+          <button
+            onClick={onMarkDone}
+            title="Done — stop the agent and move to Done"
+            aria-label="Mark session done"
+            className="rounded px-1 text-[11px] leading-5 text-[#8a93a6] opacity-0 transition-opacity hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
+          >
+            ✓
           </button>
         )}
         <button

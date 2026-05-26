@@ -36,6 +36,7 @@ export interface IpcApi {
   'session:reclaimIdle': () => number
   'session:delete': (id: string) => void
   'session:setPinned': (args: { id: string; pinned: boolean }) => SessionInfo
+  'session:markDone': (id: string) => void
 
   // Code traversal / review (scoped to a session's cwd/worktree)
   'fs:readDir': (args: { sessionId: string; relPath: string }) => FileEntry[]

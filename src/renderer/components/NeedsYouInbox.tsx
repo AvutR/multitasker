@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { NeedsYouItem } from '@shared/types'
 import { rankNeedsYou } from '@shared/board'
 import { useStore } from '../store/store'
@@ -14,9 +15,18 @@ export function NeedsYouInbox() {
   const decideAction = useStore((s) => s.decideAction)
   const deleteSession = useStore((s) => s.deleteSession)
   const resume = useStore((s) => s.resume)
+  // Disable an action's buttons the instant it's clicked, so the (brief) window
+  // before the item leaves the queue can't be double-clicked.
+  const [deciding, setDeciding] = useState<Set<string>>(() => new Set())
 
   const items = rankNeedsYou(Object.values(sessions), Object.values(planRequests), actions)
   const running = Object.values(sessions).filter((s) => s.status === 'running').length
+
+  const onDecide = (actionId: string, approve: boolean) => {
+    if (deciding.has(actionId)) return
+    setDeciding((s) => new Set(s).add(actionId))
+    void decideAction(actionId, approve)
+  }
 
   const onDelete = (sessionId: string, title: string) => {
     if (window.confirm(`Delete "${title}"?\nThis stops the agent and removes it from the board. This can't be undone.`)) {
@@ -67,11 +77,19 @@ export function NeedsYouInbox() {
             )}
             {item.kind === 'action' && item.actionId && (
               <>
-                <button onClick={() => void decideAction(item.actionId!, false)} className="rounded px-2 py-1 text-[11px] text-[#f06d6d] hover:bg-[#f06d6d]/10">
+                <button
+                  disabled={deciding.has(item.actionId)}
+                  onClick={() => onDecide(item.actionId!, false)}
+                  className="rounded px-2 py-1 text-[11px] text-[#f06d6d] hover:bg-[#f06d6d]/10 disabled:opacity-40"
+                >
                   Reject
                 </button>
-                <button onClick={() => void decideAction(item.actionId!, true)} className="rounded bg-[#5bd4a4] px-2 py-1 text-[11px] font-semibold text-ink-900">
-                  Approve
+                <button
+                  disabled={deciding.has(item.actionId)}
+                  onClick={() => onDecide(item.actionId!, true)}
+                  className="rounded bg-[#5bd4a4] px-2 py-1 text-[11px] font-semibold text-ink-900 disabled:opacity-50"
+                >
+                  {deciding.has(item.actionId) ? '…' : 'Approve'}
                 </button>
               </>
             )}

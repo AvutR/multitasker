@@ -160,6 +160,18 @@ export class SessionManager {
     this.sessions.get(id)?.markLanded()
   }
 
+  /** Mark a session's work done: stop its subprocess (freeing its slot) and move
+   *  it to the Done lane. Works whether the session is live or already stopped. */
+  markDone(id: string): void {
+    const live = this.sessions.get(id)
+    if (live) {
+      live.markDone()
+    } else {
+      const updated = this.repos.sessions.update(id, { status: 'stopped', workState: 'done' })
+      if (updated) this.bus.emit({ channel: 'session:updated', payload: updated })
+    }
+  }
+
   /** Remove a session entirely: stop its subprocess, free its slot, and
    *  hard-delete its row, transcript, and audit entries. */
   delete(id: string): void {
