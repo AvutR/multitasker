@@ -108,6 +108,15 @@ export class AgentSession {
     this.patch({ status: 'landed' })
   }
 
+  /** Mark the work done: free the subprocess and set the persistent workState to
+   *  'done' so the task leaves Idle for the Done lane (status stopped preserves
+   *  workState, so we pass 'done' explicitly). */
+  markDone(): void {
+    this.patch({ status: 'stopped', workState: 'done' })
+    this.abort.abort()
+    this.queue.close()
+  }
+
   /** Tear down for deletion: abort the subprocess and silence any late events. */
   dispose(): void {
     this.destroyed = true

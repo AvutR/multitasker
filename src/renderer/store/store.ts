@@ -48,6 +48,7 @@ interface State {
   fork: (id: string) => Promise<void>
   deleteSession: (id: string) => Promise<void>
   setPinned: (id: string, pinned: boolean) => Promise<void>
+  markDone: (id: string) => Promise<void>
   approvePlan: (id: string, approved: boolean, feedback?: string) => Promise<void>
   setPolicyMode: (actionType: string, mode: PolicyMode) => Promise<void>
   setDryRun: (dryRun: boolean) => Promise<void>
@@ -159,6 +160,10 @@ export const useStore = create<State>((set, get) => ({
   setPinned: async (id, pinned) => {
     const info = await window.api.invoke('session:setPinned', { id, pinned })
     set((st) => ({ sessions: { ...st.sessions, [id]: info } }))
+  },
+  markDone: async (id) => {
+    // The session:updated event moves it to the Done lane.
+    await window.api.invoke('session:markDone', id)
   },
   approvePlan: async (id, approved, feedback) => {
     await window.api.invoke('session:approvePlan', { id, approved, feedback })

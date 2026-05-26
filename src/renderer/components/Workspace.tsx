@@ -19,6 +19,7 @@ export function Workspace() {
   const session = useStore((s) => (selectedId ? s.sessions[selectedId] : undefined))
   const models = useStore((s) => s.models)
   const resume = useStore((s) => s.resume)
+  const markDone = useStore((s) => s.markDone)
   const [tab, setTab] = useState<Tab>('transcript')
 
   if (!session) {
@@ -45,6 +46,15 @@ export function Workspace() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {(session.status === 'running' || session.status === 'queued' || session.status === 'awaiting_input') && (
+            <button
+              onClick={() => void markDone(session.id)}
+              title="Done — stop the agent and move this task to Done"
+              className="rounded border border-ink-500 px-2.5 py-1 text-xs font-medium text-[#8a93a6] hover:bg-ink-700 hover:text-[#5bd4a4]"
+            >
+              ✓ Done
+            </button>
+          )}
           {isRevivableStatus(session.status) && (
             <button
               onClick={() => void resume(session.id)}

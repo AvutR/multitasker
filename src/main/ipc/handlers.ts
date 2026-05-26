@@ -47,6 +47,7 @@ export function registerIpcHandlers(ctx: AppContext): void {
   handle('session:reclaimIdle', () => ctx.sessions.reclaimIdle())
   handle('session:delete', (id) => ctx.sessions.delete(id))
   handle('session:setPinned', ({ id, pinned }) => ctx.sessions.setPinned(id, pinned))
+  handle('session:markDone', (id) => ctx.sessions.markDone(id))
 
   // Code traversal / review
   handle('fs:readDir', ({ sessionId, relPath }) => listDir(cwdFor(sessionId), relPath))

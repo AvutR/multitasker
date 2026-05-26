@@ -58,6 +58,15 @@ export class ActionService {
     this.repos.policies.setMode(actionType, mode)
     const state = this.policyState()
     this.bus.emit({ channel: 'policy:updated', payload: state })
+    // Make AUTO authoritative AND retroactive: clear any already-pending actions
+    // of this type by firing them, so flipping to AUTO actually stops asking
+    // (otherwise items queued before the change keep prompting). No-op under
+    // dry-run, where they'd dry_run instead.
+    if (mode === 'auto' && !state.dryRun) {
+      for (const a of this.repos.actions.list(200)) {
+        if (a.status === 'pending' && a.actionType === actionType) void this.decide(a.id, true)
+      }
+    }
     return state
   }
 
@@ -149,6 +158,12 @@ export class ActionService {
     if (decision?.effect === 'drop') {
       return this.update(id, { status: 'dropped', decidedBy: decision.decidedBy, decidedAt: Date.now() })
     }
+    // Claim synchronously — move out of 'pending' BEFORE the (slow) connector call.
+    // SQLite is synchronous, so a concurrent/double-click decide() then sees a
+    // non-pending status and no-ops instead of double-firing, and the approval
+    // item leaves the inbox immediately rather than lingering for seconds.
+    // execute() downgrades to 'failed' if the connector throws.
+    this.update(id, { status: 'fired', decidedBy: 'user', decidedAt: Date.now() })
     return this.execute(rec, 'user')
   }
 

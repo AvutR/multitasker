@@ -340,6 +340,26 @@ describe('SessionManager delete + pin', () => {
     manager.setPinned(a.id, false)
     expect(repos.sessions.get(a.id)?.pinned).toBe(false)
   })
+
+  it('markDone stops a live session, frees its slot, and moves it to Done (workState)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 1 })
+    h.queryImpl = parkedRun
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const a = await manager.spawn({ prompt: 'A', cwd: '/tmp/x', presetId: 'explore' })
+    const b = await manager.spawn({ prompt: 'B', cwd: '/tmp/x', presetId: 'explore' })
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === a.id)?.status).toBe('running'))
+
+    manager.markDone(a.id)
+
+    await vi.waitFor(() => {
+      const s = manager.list().find((x) => x.id === a.id)!
+      expect(s.status).toBe('stopped')
+      expect(s.workState).toBe('done')
+    })
+    // a's slot is freed, so the queued b starts running.
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === b.id)?.status).toBe('running'))
+  })
 })
 
 describe('integration MCP server wiring', () => {

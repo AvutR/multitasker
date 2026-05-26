@@ -223,3 +223,53 @@ describe('ActionService.propose idempotency (dedup duplicate updates)', () => {
     expect(retry.status).toBe('fired')
   })
 })
+
+describe('decide() claims synchronously — no double-fire on double-click', () => {
+  it('two concurrent decides call the connector exactly once', async () => {
+    const db = openDatabase(':memory:')
+    const repos = createRepositories(db)
+    seedDefaultPolicies(repos)
+    repos.settings.set({ dryRun: false })
+    const bus = new EventBus()
+    let calls = 0
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const slow: ConnectorGateway = {
+      async execute() {
+        calls += 1
+        await gate // hold the "connector call" open to simulate the real latency
+        return { ok: true }
+      }
+    }
+    const svc = new ActionService(repos, bus, slow)
+    const queued = await svc.propose({ sessionId: 's', actionType: 'slack.message', summary: 'x', payload: { channel: '#c', text: 'hi' } })
+    expect(queued.status).toBe('pending')
+    const p1 = svc.decide(queued.id, true)
+    const p2 = svc.decide(queued.id, true) // the double-click, during the slow call
+    release()
+    await Promise.all([p1, p2])
+    expect(calls).toBe(1) // claim moved it out of 'pending' before the await, so p2 no-ops
+  })
+})
+
+describe('setMode AUTO is authoritative + retroactive', () => {
+  it('flipping a type to AUTO fires its already-pending actions', async () => {
+    const { svc, gateway } = setup(false) // dry-run off
+    const q = await svc.propose({ sessionId: 's', actionType: 'slack.message', summary: 'x', payload: { channel: '#c', text: 'hi' } })
+    expect(q.status).toBe('pending') // slack defaults APPROVE
+    expect(gateway.calls).toHaveLength(0)
+    svc.setMode('slack.message', 'auto')
+    await new Promise((r) => setTimeout(r, 0)) // let the retroactive decide() settle
+    expect(svc.list().find((a) => a.id === q.id)?.status).toBe('fired')
+    expect(gateway.calls).toHaveLength(1)
+  })
+
+  it('does NOT fire pending actions under dry-run (records intent only)', async () => {
+    const { svc, gateway } = setup(true) // dry-run ON
+    const q = await svc.propose({ sessionId: 's', actionType: 'slack.message', summary: 'x', payload: { channel: '#c', text: 'hi' } })
+    expect(q.status).toBe('dry_run') // dry-run → recorded, not pending
+    svc.setMode('slack.message', 'auto')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(gateway.calls).toHaveLength(0) // nothing fired under dry-run
+  })
+})
