@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SessionInfo } from '@shared/types'
 import { groupSessions } from '@shared/board'
 import { useStore } from '../store/store'
+import { Icon } from './Icon'
 import { NeedsYouInbox } from './NeedsYouInbox'
 import { SessionCard } from './SessionCard'
 
@@ -35,13 +36,15 @@ export function MissionControl({ onNew }: { onNew: () => void }) {
       </div>
 
       {total === 0 ? (
-        <div className="grid place-items-center py-16 text-center">
-          <div>
-            <div className="text-sm text-[#8a93a6]">No agents yet.</div>
-            <button onClick={onNew} className="mt-3 rounded bg-accent px-3 py-1.5 text-sm font-semibold text-ink-900 hover:bg-[#8bbcff]">
-              Spawn your first agent
-            </button>
+        <div className="mx-auto mt-10 max-w-sm rounded-2xl border border-ink-700 bg-ink-800/40 px-8 py-10 text-center">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <Icon name="sparkle" size={18} />
           </div>
+          <div className="text-sm text-[#d7dbe3]">Nothing running yet</div>
+          <div className="mt-1 text-xs text-[#6b7280]">Spawn an agent and watch it work — many in parallel.</div>
+          <button onClick={onNew} className="mt-5 inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-[#8bbcff]">
+            <Icon name="plus" /> New session
+          </button>
         </div>
       ) : (
         <>
@@ -89,10 +92,10 @@ function Lane({
         {onToggle ? (
           <button
             onClick={onToggle}
-            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#6b7280] hover:text-[#8a93a6]"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#6b7280] transition-colors hover:text-[#8a93a6]"
             aria-expanded={!collapsed}
           >
-            <span className="text-[9px] text-[#3a4150]">{collapsed ? '▸' : '▾'}</span>
+            <span className="text-[#3a4150]"><Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={10} /></span>
             {header}
           </button>
         ) : (

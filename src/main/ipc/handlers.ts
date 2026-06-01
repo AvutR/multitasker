@@ -3,6 +3,7 @@ import type { IpcApi, IpcChannel, IpcPayload, IpcResult } from '@shared/ipc'
 import { ACTION_TYPES } from '../integrations/actionTypes'
 import type { ActionService } from '../integrations/ActionService'
 import type { LinearService } from '../integrations/LinearService'
+import { getActiveTracker, listProviderIds } from '../integrations/trackers/registry'
 import type { EventBus } from '../events'
 import type { Repositories } from '../db/repositories'
 import type { SessionManager } from '../orchestrator/SessionManager'
@@ -77,8 +78,12 @@ export function registerIpcHandlers(ctx: AppContext): void {
   handle('actions:list', ({ limit }) => ctx.actions.list(limit))
   handle('actions:decide', ({ id, approve }) => ctx.actions.decide(id, approve))
 
-  // Linear inbox
-  handle('linear:myIssues', () => ctx.linear.listMyIssues())
+  // Tracker inbox — Linear is the default; the active provider is configurable
+  // via ~/.multitasker/trackers.json. See src/main/integrations/trackers/.
+  // (The IPC name `linear:myIssues` is retained for back-compat — the renderer
+  // store / UI is provider-agnostic now that the data shape is TrackerItem.)
+  handle('linear:myIssues', () => getActiveTracker().listMyItems())
+  handle('tracker:listProviders', () => listProviderIds())
 
   // Models
   handle('models:list', () => listModels(ctx.repos.settings.get()))

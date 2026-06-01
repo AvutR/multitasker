@@ -2,6 +2,7 @@ import type { SessionInfo } from '@shared/types'
 import { isRevivableStatus } from '@shared/board'
 import { useStore } from '../store/store'
 import { Badge, formatCost, StatusDot } from './bits'
+import { Icon } from './Icon'
 
 export function SessionCard({ session }: { session: SessionInfo }) {
   const select = useStore((s) => s.select)
@@ -63,15 +64,15 @@ export function SessionCard({ session }: { session: SessionInfo }) {
       </button>
 
       {/* Hover actions — siblings of the select button (no nested buttons). */}
-      <div className="absolute right-1.5 top-1.5 flex gap-0.5">
+      <div className="absolute right-1 top-1 flex gap-0.5">
         {revivable && (
           <button
             onClick={onResume}
             title="Resume — continue this session"
             aria-label="Resume session"
-            className="rounded px-1 text-[11px] leading-5 text-[#8a93a6] opacity-0 transition-opacity hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
+            className="inline-flex items-center justify-center rounded p-1 text-[#8a93a6] opacity-0 transition-opacity duration-200 hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
           >
-            ↻
+            <Icon name="resume" />
           </button>
         )}
         {canMarkDone && (
@@ -79,28 +80,28 @@ export function SessionCard({ session }: { session: SessionInfo }) {
             onClick={onMarkDone}
             title="Done — stop the agent and move to Done"
             aria-label="Mark session done"
-            className="rounded px-1 text-[11px] leading-5 text-[#8a93a6] opacity-0 transition-opacity hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
+            className="inline-flex items-center justify-center rounded p-1 text-[#8a93a6] opacity-0 transition-opacity duration-200 hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
           >
-            ✓
+            <Icon name="done" />
           </button>
         )}
         <button
           onClick={onPin}
           title={session.pinned ? 'Unpin' : 'Pin to top'}
           aria-label={session.pinned ? 'Unpin session' : 'Pin session'}
-          className={`rounded px-1 text-[11px] leading-5 text-[#8a93a6] transition-opacity hover:bg-ink-600 hover:text-[#d7dbe3] ${
-            session.pinned ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          className={`inline-flex items-center justify-center rounded p-1 transition-opacity duration-200 hover:bg-ink-600 ${
+            session.pinned ? 'text-accent opacity-100' : 'text-[#8a93a6] opacity-0 hover:text-[#d7dbe3] group-hover:opacity-100'
           }`}
         >
-          {session.pinned ? '📌' : '📍'}
+          <Icon name="pin" filled={session.pinned} />
         </button>
         <button
           onClick={onDelete}
           title="Delete session"
           aria-label="Delete session"
-          className="rounded px-1 text-[12px] leading-5 text-[#8a93a6] opacity-0 transition-opacity hover:bg-[#f06d6d]/20 hover:text-[#f06d6d] group-hover:opacity-100"
+          className="inline-flex items-center justify-center rounded p-1 text-[#8a93a6] opacity-0 transition-opacity duration-200 hover:bg-[#f06d6d]/20 hover:text-[#f06d6d] group-hover:opacity-100"
         >
-          ✕
+          <Icon name="delete" />
         </button>
       </div>
     </div>

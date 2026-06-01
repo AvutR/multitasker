@@ -55,8 +55,9 @@ export interface IpcApi {
   'actions:decide': (args: { id: string; approve: boolean }) => ActionRecord
 
   // Presets / settings / repos
-  // Linear inbox
+  // Tracker inbox (Linear is the default provider; see src/main/integrations/trackers/)
   'linear:myIssues': () => LinearIssue[]
+  'tracker:listProviders': () => string[]
 
   // Models
   'models:list': () => ModelOption[]

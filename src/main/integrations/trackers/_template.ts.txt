@@ -1,0 +1,31 @@
+// Template for adding a new tracker provider (Jira, GitHub Projects, ClickUp,
+// Shortcut, Asana, a Notion database, …). Copy this file to `<your-id>.ts`,
+// fill in `listMyItems`, and register the factory in `./registry.ts`.
+//
+// Most production tools expose either an MCP server or a REST API. The cheapest
+// integration is the Linear pattern: drive the user's already-configured MCP
+// connector through a tightly-scoped headless Agent SDK run. The expensive
+// path is a direct HTTP client + auth — only worth it if there's no MCP.
+//
+// import type { TrackerItem, TrackerProvider } from './types'
+//
+// export class JiraTracker implements TrackerProvider {
+//   readonly id = 'jira'
+//   readonly label = 'Jira'
+//
+//   async listMyItems(): Promise<TrackerItem[]> {
+//     // Adapt your domain object onto TrackerItem:
+//     //   id          — stable internal id
+//     //   identifier  — human key shown in the UI ('PROJ-123', '#42', …)
+//     //   title, url, state — obvious
+//     //   branchName  — your tool's suggested branch (or one you derive)
+//     //   description — short summary (<= 500 chars is plenty)
+//     return []
+//   }
+//
+//   async isAvailable(): Promise<boolean> {
+//     // Cheap probe: is the connector / API key present? Return false on error
+//     // so the UI can degrade gracefully instead of hard-failing.
+//     return true
+//   }
+// }

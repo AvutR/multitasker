@@ -206,16 +206,23 @@ export interface SpawnRequest {
   branchName?: string
 }
 
-/** An issue fetched from Linear (assigned to the current user). */
-export interface LinearIssue {
+/**
+ * A work item from any tracker provider (Linear, Jira, GitHub Projects, …).
+ * Generic by design — providers adapt their domain object onto this shape.
+ */
+export interface TrackerItem {
   id: string
-  identifier: string // e.g. ENG-1234
+  identifier: string // human-readable key, e.g. ENG-1234 (Linear), PROJ-12 (Jira), #42 (GH Projects)
   title: string
   url: string
   state: string
-  branchName: string // Linear's suggested git branch name
+  branchName: string // a sensible git branch name for the item (provider-specific convention)
   description?: string
+  providerId?: string // 'linear' | 'jira' | … — which provider produced this item
 }
+
+/** @deprecated Use `TrackerItem`. Kept as a type alias for back-compat. */
+export type LinearIssue = TrackerItem
 
 export interface AppSettings {
   dryRun: boolean

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { isRevivableStatus } from '@shared/board'
 import { useStore } from '../store/store'
+import { Icon } from './Icon'
 import { formatCost, StatusDot } from './bits'
 import { Transcript } from './Transcript'
 import { CodeView } from './CodeView'
@@ -50,18 +51,18 @@ export function Workspace() {
             <button
               onClick={() => void markDone(session.id)}
               title="Done — stop the agent and move this task to Done"
-              className="rounded border border-ink-500 px-2.5 py-1 text-xs font-medium text-[#8a93a6] hover:bg-ink-700 hover:text-[#5bd4a4]"
+              className="inline-flex items-center gap-1.5 rounded border border-ink-500 px-2.5 py-1 text-xs font-medium text-[#8a93a6] transition-colors hover:bg-ink-700 hover:text-[#5bd4a4]"
             >
-              ✓ Done
+              <Icon name="done" /> Done
             </button>
           )}
           {isRevivableStatus(session.status) && (
             <button
               onClick={() => void resume(session.id)}
               title="Resume — continue this session where it left off"
-              className="rounded border border-[#5bd4a4]/40 px-2.5 py-1 text-xs font-medium text-[#5bd4a4] hover:bg-[#5bd4a4]/10"
+              className="inline-flex items-center gap-1.5 rounded border border-[#5bd4a4]/40 px-2.5 py-1 text-xs font-medium text-[#5bd4a4] transition-colors hover:bg-[#5bd4a4]/10"
             >
-              ↻ Resume
+              <Icon name="resume" /> Resume
             </button>
           )}
           <div className="flex gap-1">

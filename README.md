@@ -84,6 +84,22 @@ On first run Multitasker drops a documented template at `~/.multitasker/workflow
 
 Your workflows are **merged over the built-ins by `id`** (reuse a built-in `id` to override it). `permissionMode` is one of `default | acceptEdits | plan | bypassPermissions`; set `useWorktree: true` to run in an isolated git worktree. A malformed file is ignored rather than breaking startup. See [`launchPresets.ts`](src/main/skills/launchPresets.ts).
 
+## Tracker providers
+
+The "Linear" inbox and the lifecycle updates (status changes, comments, weekly project notes) are plugged into your project tracker through a small `TrackerProvider` interface. **Linear ships as the default**, and the engine is provider-agnostic — anything that walks like a tracker (Jira, GitHub Projects, ClickUp, Shortcut, Asana, a Notion database) plugs in by implementing a single file.
+
+To wire up a different tracker:
+
+1. Write a class that implements `TrackerProvider` (see `src/main/integrations/trackers/_template.ts.txt` and `linear.ts` — it's three small methods: `id`, `label`, `listMyItems`).
+2. Register it in `src/main/integrations/trackers/registry.ts`.
+3. Select it as the default with a one-line config:
+
+   ```bash
+   echo '{ "active": "jira" }' > ~/.multitasker/trackers.json
+   ```
+
+If `trackers.json` is missing or names a provider the build doesn't know, the engine falls back to Linear.
+
 ## How it works
 
 ```

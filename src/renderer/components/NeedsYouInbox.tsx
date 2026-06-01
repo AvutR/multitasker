@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { NeedsYouItem } from '@shared/types'
 import { rankNeedsYou } from '@shared/board'
 import { useStore } from '../store/store'
+import { Icon } from './Icon'
 
 const KIND_GLYPH: Record<NeedsYouItem['kind'], string> = { error: '✕', plan: '◆', action: '↗' }
 const KIND_COLOR: Record<NeedsYouItem['kind'], string> = { error: '#f06d6d', plan: '#f5c451', action: '#6ea8fe' }
@@ -36,10 +37,15 @@ export function NeedsYouInbox() {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-[#5bd4a4]/30 bg-[#5bd4a4]/5 px-4 py-6 text-center">
-        <div className="text-sm font-medium text-[#5bd4a4]">✓ All caught up</div>
-        <div className="mt-1 text-xs text-[#6b7280]">
-          {running > 0 ? `${running} agent${running > 1 ? 's' : ''} running clean — nothing needs you.` : 'Nothing needs your attention.'}
+      <div className="flex items-center gap-3 rounded-lg border border-[#5bd4a4]/20 bg-[#5bd4a4]/[0.04] px-4 py-5">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#5bd4a4]/30 text-[#5bd4a4]">
+          <Icon name="done" size={14} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm text-[#d7dbe3]">All caught up</div>
+          <div className="mt-0.5 text-[11px] text-[#6b7280]">
+            {running > 0 ? `${running} agent${running > 1 ? 's' : ''} running clean — nothing needs you right now.` : 'Nothing needs your attention.'}
+          </div>
         </div>
       </div>
     )
@@ -95,8 +101,8 @@ export function NeedsYouInbox() {
             )}
             {item.kind === 'error' && (
               <>
-                <button onClick={() => void resume(item.sessionId)} title="Retry — resume this session" className="rounded border border-[#5bd4a4]/40 px-2 py-1 text-[11px] font-medium text-[#5bd4a4] hover:bg-[#5bd4a4]/10">
-                  ↻ Retry
+                <button onClick={() => void resume(item.sessionId)} title="Retry — resume this session" className="inline-flex items-center gap-1 rounded border border-[#5bd4a4]/40 px-2 py-1 text-[11px] font-medium text-[#5bd4a4] transition-colors hover:bg-[#5bd4a4]/10">
+                  <Icon name="resume" /> Retry
                 </button>
                 <button onClick={() => void select(item.sessionId)} className="rounded border border-ink-500 px-2 py-1 text-[11px] text-[#b9c0cc] hover:bg-ink-700">
                   Open
