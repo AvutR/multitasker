@@ -18,6 +18,9 @@ interface PendingSpawn {
 
 const LIVE_STATUSES = ['queued', 'running', 'awaiting_input', 'awaiting_plan_approval']
 
+/** Hard ceiling on sub-agents a single conductor may spawn (runaway-loop guard). */
+const MAX_DELEGATIONS = 25
+
 /**
  * Owns the live AgentSession pool. Enforces a concurrency cap: a live session
  * holds a Claude Code subprocess for its lifetime, so spawns over the cap are
@@ -36,7 +39,17 @@ export class SessionManager {
     private readonly worktrees: WorktreeManager,
     private readonly automation: LifecycleAutomation
   ) {
-    this.deps = { repos, bus, actions }
+    // Inject the orchestration capability so conductor sessions can fan work out
+    // to cheaper sub-agents (the MCP layer stays free of any orchestrator import).
+    this.deps = {
+      repos,
+      bus,
+      actions,
+      orchestration: {
+        delegate: (parentId, input) => this.delegate(parentId, input),
+        listChildren: (parentId) => this.listChildren(parentId)
+      }
+    }
   }
 
   /** Previously-live sessions can't survive a restart (their subprocess is gone),
@@ -114,7 +127,8 @@ export class SessionManager {
       error: null,
       workState: 'active',
       linearIssueId: req.linearIssueId ?? null,
-      notionPageId: req.notionPageId ?? null
+      notionPageId: req.notionPageId ?? null,
+      parentId: req.parentId ?? null
     }
     this.repos.sessions.insert(info)
     this.bus.emit({ channel: 'session:updated', payload: info })
@@ -170,6 +184,57 @@ export class SessionManager {
       const updated = this.repos.sessions.update(id, { status: 'stopped', workState: 'done' })
       if (updated) this.bus.emit({ channel: 'session:updated', payload: updated })
     }
+  }
+
+  // --- agentic orchestration (conductor → sub-agents) ----------------------
+
+  /** Spawn a sub-agent for a conductor. The child runs on the cheaper delegate
+   *  model, in the conductor's working directory (shared worktree), linked by
+   *  parentId. Goes through the same cap/queue as any session. */
+  private async delegate(
+    parentId: string,
+    input: { title?: string; prompt: string; model?: string }
+  ): Promise<{ id: string; title: string; status: string }> {
+    // Fail-safe: bound how many sub-agents one conductor can spawn so a runaway
+    // delegation loop can't fill the queue with unbounded sessions.
+    const existing = this.repos.sessions.list().filter((s) => s.parentId === parentId).length
+    if (existing >= MAX_DELEGATIONS) {
+      return { id: '', title: input.title ?? '', status: `refused — delegation limit (${MAX_DELEGATIONS}) reached` }
+    }
+    const parent = this.repos.sessions.get(parentId)
+    const settings = this.repos.settings.get()
+    const child = await this.spawn({
+      prompt: input.prompt,
+      cwd: parent?.cwd ?? process.cwd(),
+      presetId: 'explore', // sub-agents are plain workers
+      model: input.model ?? settings.delegateModel ?? 'sonnet',
+      title: input.title,
+      parentId,
+      useWorktree: false // share the conductor's worktree so sub-agents collaborate
+    })
+    return { id: child.id, title: child.title, status: child.status }
+  }
+
+  /** Snapshot of a conductor's sub-agents — status + a short tail of output so
+   *  the conductor can coordinate or synthesize. */
+  private listChildren(parentId: string): { id: string; title: string; status: string; summary: string }[] {
+    return this.list()
+      .filter((s) => s.parentId === parentId)
+      .map((s) => ({ id: s.id, title: s.title, status: s.status, summary: this.lastAssistantText(s.id) }))
+  }
+
+  private lastAssistantText(sessionId: string): string {
+    const msgs = this.repos.messages.listBySession(sessionId)
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].kind !== 'assistant') continue
+      const text = msgs[i].blocks
+        .filter((b) => b.type === 'text')
+        .map((b) => (b.type === 'text' ? b.text : ''))
+        .join(' ')
+        .trim()
+      if (text) return text.length > 280 ? `${text.slice(0, 280)}…` : text
+    }
+    return ''
   }
 
   /** Remove a session entirely: stop its subprocess, free its slot, and

@@ -51,6 +51,8 @@ export interface SessionInfo {
    *  automation re-registers from these on startup). */
   linearIssueId?: string | null
   notionPageId?: string | null
+  /** Set when this session was delegated by a conductor — its orchestrator. */
+  parentId?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +206,8 @@ export interface SpawnRequest {
   autoUpdates?: boolean
   /** Branch name for the session's worktree (e.g. derived from a Linear issue). */
   branchName?: string
+  /** Set when a conductor delegates this session as a sub-task. */
+  parentId?: string | null
 }
 
 /**
@@ -243,6 +247,8 @@ export interface AppSettings {
   dryRun: boolean
   concurrencyCap: number
   defaultModel: string // a ModelOption id (see main/models.ts)
+  /** Model id used for delegated sub-agents — cheaper than the conductor's. */
+  delegateModel?: string
   // Optional Anthropic-compatible gateway for non-Anthropic providers
   // (LiteLLM / OpenRouter / Bedrock-proxy / etc.).
   gatewayBaseUrl?: string

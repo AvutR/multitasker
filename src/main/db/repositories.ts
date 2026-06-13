@@ -12,7 +12,8 @@ import type { Db } from './database'
 export const DEFAULT_SETTINGS: AppSettings = {
   dryRun: true, // safe by default during bring-up — never hits a live connector
   concurrencyCap: 6,
-  defaultModel: 'opus' // a ModelOption id (see main/models.ts)
+  defaultModel: 'opus', // a ModelOption id (see main/models.ts)
+  delegateModel: 'sonnet' // cheaper tier for conductor-delegated sub-agents
 }
 
 // --- row shapes ------------------------------------------------------------
@@ -38,6 +39,7 @@ interface SessionRow {
   work_state: string | null
   linear_issue_id: string | null
   notion_page_id: string | null
+  parent_id: string | null
 }
 
 interface MessageRow {
@@ -89,7 +91,8 @@ function toSession(r: SessionRow): SessionInfo {
     pinned: r.pinned === 1,
     workState: (r.work_state as SessionInfo['workState']) ?? undefined,
     linearIssueId: r.linear_issue_id,
-    notionPageId: r.notion_page_id
+    notionPageId: r.notion_page_id,
+    parentId: r.parent_id
   }
 }
 
@@ -102,7 +105,8 @@ function bindSession(s: SessionInfo): Record<string, unknown> {
     pinned: s.pinned ? 1 : 0,
     workState: s.workState ?? null,
     linearIssueId: s.linearIssueId ?? null,
-    notionPageId: s.notionPageId ?? null
+    notionPageId: s.notionPageId ?? null,
+    parentId: s.parentId ?? null
   }
 }
 
@@ -146,10 +150,10 @@ export class SessionRepo {
       .prepare(
         `INSERT INTO sessions (id, sdk_session_id, title, model, cwd, repo_id, branch, worktree_path,
            status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error,
-           pinned, work_state, linear_issue_id, notion_page_id)
+           pinned, work_state, linear_issue_id, notion_page_id, parent_id)
          VALUES (@id, @sdkSessionId, @title, @model, @cwd, @repoId, @branch, @worktreePath,
            @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error,
-           @pinned, @workState, @linearIssueId, @notionPageId)`
+           @pinned, @workState, @linearIssueId, @notionPageId, @parentId)`
       )
       .run(bindSession(s))
   }
@@ -170,7 +174,8 @@ export class SessionRepo {
            repo_id=@repoId, branch=@branch, worktree_path=@worktreePath, status=@status,
            permission_mode=@permissionMode, preset_id=@presetId, total_cost_usd=@totalCostUsd,
            num_turns=@numTurns, updated_at=@updatedAt, error=@error,
-           work_state=@workState, linear_issue_id=@linearIssueId, notion_page_id=@notionPageId
+           work_state=@workState, linear_issue_id=@linearIssueId, notion_page_id=@notionPageId,
+           parent_id=@parentId
          WHERE id=@id`
       )
       .run(bindSession(next))

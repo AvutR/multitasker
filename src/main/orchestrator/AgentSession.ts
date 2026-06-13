@@ -4,7 +4,7 @@ import type { Repositories } from '../db/repositories'
 import type { EventBus } from '../events'
 import type { ActionService } from '../integrations/ActionService'
 import { createConnectorGate, type GateDecision } from '../integrations/guards'
-import { createIntegrationMcpServer } from '../integrations/integrationMcpServer'
+import { createIntegrationMcpServer, type Orchestration } from '../integrations/integrationMcpServer'
 import { resolveModel } from '../models'
 import { claudeExecutablePath } from '../sdkRuntime'
 import { AsyncQueue } from '../util/AsyncQueue'
@@ -14,6 +14,8 @@ export interface SessionDeps {
   repos: Repositories
   bus: EventBus
   actions: ActionService
+  /** Present so conductor sessions can delegate to cheaper sub-agents. */
+  orchestration?: Orchestration
 }
 
 export interface SessionLaunchOptions {
@@ -136,7 +138,7 @@ export class AgentSession {
   private async run(resume: { resume?: string; fork: boolean } | undefined): Promise<void> {
     const sdk = (await import('@anthropic-ai/claude-agent-sdk')) as { query: unknown }
     const query = sdk.query as LooseQuery
-    const integrationServer = createIntegrationMcpServer(this.deps.actions, this.info.id)
+    const integrationServer = createIntegrationMcpServer(this.deps.actions, this.info.id, this.deps.orchestration)
     this.patch({ status: 'running' })
 
     const options: Record<string, unknown> = {

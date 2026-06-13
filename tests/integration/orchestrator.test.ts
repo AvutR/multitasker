@@ -362,6 +362,69 @@ describe('SessionManager delete + pin', () => {
   })
 })
 
+describe('agentic orchestration: conductor → cheaper sub-agents', () => {
+  // A query impl that yields nothing and ends immediately — the child's run
+  // loop completes without needing the real binary, keeping the test hermetic.
+  const noop = () => (async function* () {})()
+
+  it('delegate spawns a child with parentId, the cheaper delegate model, and the parent cwd; listChildren includes it', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8, delegateModel: 'haiku' })
+    h.queryImpl = noop
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'orchestrate it', cwd: '/tmp/proj', presetId: 'conduct', useWorktree: false })
+
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function; listChildren: Function } } }).deps.orchestration
+    const child = (await orch.delegate(conductor.id, { title: 'piece A', prompt: 'do A' })) as { id: string }
+
+    const childInfo = manager.list().find((s) => s.id === child.id)!
+    expect(childInfo.parentId).toBe(conductor.id)
+    expect(childInfo.model).toBe('haiku') // cheaper delegate tier, not the conductor's model
+    expect(childInfo.cwd).toBe('/tmp/proj') // shares the conductor's working dir
+    expect(childInfo.presetId).toBe('explore') // sub-agents are plain workers
+
+    const kids = orch.listChildren(conductor.id) as { id: string }[]
+    expect(kids.map((k) => k.id)).toContain(child.id)
+  })
+
+  it('listChildren surfaces a child’s latest assistant output for synthesis', () => {
+    const { repos, bus, actions } = deps()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const parent = makeInfo(repos, { id: randomUUID() })
+    const child = makeInfo(repos, { parentId: parent.id, title: 'child' })
+    repos.messages.insert({
+      id: randomUUID(), sessionId: child.id, kind: 'assistant',
+      blocks: [{ type: 'text', text: 'finished piece A, all tests pass' }], createdAt: Date.now()
+    })
+    const orch = (manager as unknown as { deps: { orchestration: { listChildren: Function } } }).deps.orchestration
+    const kids = orch.listChildren(parent.id) as { id: string; summary: string }[]
+    expect(kids).toHaveLength(1)
+    expect(kids[0].summary).toContain('finished piece A')
+  })
+
+  it('refuses to delegate past the per-conductor limit (runaway-loop guard)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 64 })
+    h.queryImpl = noop
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'go', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    let refused: string | null = null
+    for (let i = 0; i < 30; i++) {
+      const r = (await orch.delegate(conductor.id, { title: `t${i}`, prompt: 'x' })) as { id: string; status: string }
+      if (r.id === '') { refused = r.status; break }
+    }
+    expect(refused).toMatch(/delegation limit/)
+  })
+
+  it('parentId round-trips through the session repo (migration 0004)', () => {
+    const { repos } = deps()
+    const info = makeInfo(repos, { parentId: 'conductor-123' })
+    expect(repos.sessions.get(info.id)?.parentId).toBe('conductor-123')
+  })
+})
+
 describe('integration MCP server wiring', () => {
   it('passes the SDK MCP server config through without double-wrapping', async () => {
     const { repos, bus, actions } = deps()

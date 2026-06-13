@@ -89,5 +89,9 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE sessions ADD COLUMN linear_issue_id TEXT;
       ALTER TABLE sessions ADD COLUMN notion_page_id  TEXT;
     `
+  },
+  {
+    name: '0004_session_parent',
+    sql: `ALTER TABLE sessions ADD COLUMN parent_id TEXT;`
   }
 ]

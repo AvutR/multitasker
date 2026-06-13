@@ -134,6 +134,7 @@ Two enforcement paths guarantee **nothing outward escapes the policy**: agents a
 |---|---|
 | **Build pipeline** | plan → code → simplify → test → security review → land a local commit. Plan mode (hits the approval gate), runs in an isolated worktree. |
 | **Explore / freeform** | a general steerable agent with your skills + integration tools wired in. |
+| **Conductor (orchestrator)** | a high-power model decomposes the goal, fans independent sub-tasks out to **cheaper parallel sub-agents** (`delegate_subtask`), monitors them (`list_subtasks`), then synthesizes. Run it on a strong model; sub-agents default to a cheaper tier. |
 | **Async standup** | summarize progress and post the standup (blockers/done/pending/testable) to Slack via the policy. |
 | **Issue tracker sync** | reconcile your tracker — statuses, progress comments, weekly project update. |
 

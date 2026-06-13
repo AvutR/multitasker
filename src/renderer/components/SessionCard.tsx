@@ -10,6 +10,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   const setPinned = useStore((s) => s.setPinned)
   const resume = useStore((s) => s.resume)
   const markDone = useStore((s) => s.markDone)
+  const childCount = useStore((s) => Object.values(s.sessions).filter((x) => x.parentId === session.id).length)
   const presets = useStore((s) => s.presets)
   const presetName = presets.find((p) => p.id === session.presetId)?.name ?? session.presetId ?? ''
   const needsYou = session.status === 'error' || session.status === 'awaiting_plan_approval'
@@ -57,7 +58,19 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2">
           <StatusDot status={session.status} />
-          {presetName && <Badge>{presetName}</Badge>}
+          <div className="flex shrink-0 items-center gap-1">
+            {childCount > 0 && (
+              <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent" title="Conductor with delegated sub-agents">
+                {childCount} sub-agent{childCount === 1 ? '' : 's'}
+              </span>
+            )}
+            {session.parentId && (
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[#6b7280]" title="Delegated by a conductor">
+                ↳ sub-agent
+              </span>
+            )}
+            {presetName && <Badge>{presetName}</Badge>}
+          </div>
         </div>
         {session.branch && <div className="mt-1 truncate font-mono text-[10px] text-[#5b6472]">⎇ {session.branch}</div>}
         {session.error && <div className="mt-1 line-clamp-2 text-[10px] text-[#f06d6d]">{session.error}</div>}

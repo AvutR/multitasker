@@ -3,6 +3,13 @@ import { z } from 'zod'
 import type { ActionRecord } from '@shared/types'
 import type { ActionService } from './ActionService'
 
+/** Lets a conductor session fan work out to cheaper, parallel sub-agents.
+ *  Injected by SessionManager so the MCP layer has no orchestrator dependency. */
+export interface Orchestration {
+  delegate: (parentId: string, input: { title?: string; prompt: string; model?: string }) => Promise<{ id: string; title: string; status: string }>
+  listChildren: (parentId: string) => { id: string; title: string; status: string; summary: string }[]
+}
+
 /**
  * Path #1 — the high-level, semantic integration tools the spawned agents call
  * (e.g. "post_standup", "update_linear_status"). Each routes through the policy
@@ -11,16 +18,41 @@ import type { ActionService } from './ActionService'
  * Created per session so the tool handlers can attribute actions to the right
  * session. Runs in-process within the orchestrator (Electron main).
  */
-export function createIntegrationMcpServer(actionService: ActionService, sessionId: string) {
+export function createIntegrationMcpServer(actionService: ActionService, sessionId: string, orchestration?: Orchestration) {
   const propose = async (actionType: string, summary: string, payload: unknown) => {
     const rec = await actionService.propose({ sessionId, actionType, summary, payload })
     return toolResult(rec)
   }
 
+  const orchestrationTools = orchestration
+    ? [
+        tool(
+          'delegate_subtask',
+          'Delegate ONE focused, independent piece of work to a cheaper parallel sub-agent. The sub-agent runs on a cheaper model in this same repo, concurrently. Use this to fan out work you have decomposed — call it once per independent sub-task. Returns the sub-agent id.',
+          {
+            title: z.string().describe('Short title for the sub-task'),
+            prompt: z.string().describe('The full, self-contained instruction for the sub-agent'),
+            model: z.string().optional().describe('Model id override (defaults to the cheaper delegate tier)')
+          },
+          async (args) => {
+            const r = await orchestration.delegate(sessionId, args)
+            return text(`Delegated "${r.title}" → sub-agent ${r.id} (${r.status}). It runs in parallel on a cheaper model; call list_subtasks to check on it before you synthesize.`)
+          }
+        ),
+        tool(
+          'list_subtasks',
+          'List the sub-agents you have delegated, with their current status and latest output, so you can coordinate, wait, or synthesize their results.',
+          {},
+          async () => text(JSON.stringify(orchestration.listChildren(sessionId), null, 2))
+        )
+      ]
+    : []
+
   return createSdkMcpServer({
     name: 'multitasker-integrations',
     version: '0.1.0',
     tools: [
+      ...orchestrationTools,
       tool(
         'post_standup',
         'Post an async project standup to Slack (blockers / done / pending / testable-in-staging). Routes through the Multitasker policy engine — may fire, queue for one-click approval, or dry-run.',
@@ -124,6 +156,10 @@ export function createIntegrationMcpServer(actionService: ActionService, session
 
 function toolResult(rec: ActionRecord) {
   return { content: [{ type: 'text' as const, text: renderOutcome(rec) }] }
+}
+
+function text(s: string) {
+  return { content: [{ type: 'text' as const, text: s }] }
 }
 
 function renderOutcome(rec: ActionRecord): string {
