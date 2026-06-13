@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { DiffFile } from '@shared/types'
 import { useStore } from '../store/store'
 import { MonacoDiff } from './MonacoDiff'
+import { BlastRadiusBar } from './BlastRadius'
 
 export function DiffView({ sessionId }: { sessionId: string }) {
   const branch = useStore((s) => s.sessions[sessionId]?.branch)
@@ -63,6 +64,11 @@ export function DiffView({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {files.length > 0 && (
+        <div className="border-b border-ink-600 px-3 py-2">
+          <BlastRadiusBar files={files} />
+        </div>
+      )}
       <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: '260px minmax(0, 1fr)' }}>
         <div className="min-h-0 overflow-y-auto border-r border-ink-600">
           <div className="flex items-center justify-between px-2 py-1.5 text-[11px] text-[#6b7280]">
