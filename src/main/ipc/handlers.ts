@@ -4,6 +4,7 @@ import { ACTION_TYPES } from '../integrations/actionTypes'
 import type { ActionService } from '../integrations/ActionService'
 import type { LinearService } from '../integrations/LinearService'
 import { getActiveTracker, listProviderIds } from '../integrations/trackers/registry'
+import { getActiveCIProvider, listCIProviderIds } from '../integrations/ci/registry'
 import type { EventBus } from '../events'
 import type { Repositories } from '../db/repositories'
 import type { SessionManager } from '../orchestrator/SessionManager'
@@ -84,6 +85,10 @@ export function registerIpcHandlers(ctx: AppContext): void {
   // store / UI is provider-agnostic now that the data shape is TrackerItem.)
   handle('linear:myIssues', () => getActiveTracker().listMyItems())
   handle('tracker:listProviders', () => listProviderIds())
+
+  // CI/CD inbox — recent pipeline runs for the session's repo (GitHub Actions default)
+  handle('ci:recentRuns', ({ sessionId }) => getActiveCIProvider().listRecentRuns(cwdFor(sessionId)))
+  handle('ci:listProviders', () => listCIProviderIds())
 
   // Models
   handle('models:list', () => listModels(ctx.repos.settings.get()))

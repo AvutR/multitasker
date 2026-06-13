@@ -5,6 +5,7 @@
 import type {
   ActionRecord,
   AppSettings,
+  CIRun,
   CommitResult,
   DiffFile,
   FileContent,
@@ -58,6 +59,10 @@ export interface IpcApi {
   // Tracker inbox (Linear is the default provider; see src/main/integrations/trackers/)
   'linear:myIssues': () => LinearIssue[]
   'tracker:listProviders': () => string[]
+
+  // CI/CD — recent pipeline runs for a session's repo (GitHub Actions default)
+  'ci:recentRuns': (args: { sessionId: string }) => CIRun[]
+  'ci:listProviders': () => string[]
 
   // Models
   'models:list': () => ModelOption[]

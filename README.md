@@ -100,6 +100,14 @@ To wire up a different tracker:
 
 If `trackers.json` is missing or names a provider the build doesn't know, the engine falls back to Linear.
 
+## CI/CD providers
+
+The **CI/CD** tab in a session shows recent pipeline runs for its repo, through the same plug-in shape — a `CIProvider` interface (`src/main/integrations/ci/`). **GitHub Actions ships as the default** (via the `gh` CLI; read-only, scoped to the repo). GitLab CI, CircleCI, Jenkins, Buildkite, etc. plug in by implementing `CIProvider` + a registry entry, selected with:
+
+```bash
+echo '{ "active": "gitlab-ci" }' > ~/.multitasker/ci.json
+```
+
 ## How it works
 
 ```

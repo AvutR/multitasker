@@ -6,13 +6,15 @@ import { formatCost, StatusDot } from './bits'
 import { Transcript } from './Transcript'
 import { CodeView } from './CodeView'
 import { DiffView } from './DiffView'
+import { CIPanel } from './CIPanel'
 import { TrustBar } from './TrustBar'
 
-type Tab = 'transcript' | 'code' | 'diff'
+type Tab = 'transcript' | 'code' | 'diff' | 'ci'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'transcript', label: 'Transcript' },
   { id: 'code', label: 'Code' },
-  { id: 'diff', label: 'Diff' }
+  { id: 'diff', label: 'Diff' },
+  { id: 'ci', label: 'CI/CD' }
 ]
 
 export function Workspace() {
@@ -84,6 +86,7 @@ export function Workspace() {
         {tab === 'transcript' && <Transcript sessionId={session.id} />}
         {tab === 'code' && <CodeView sessionId={session.id} />}
         {tab === 'diff' && <DiffView sessionId={session.id} />}
+        {tab === 'ci' && <CIPanel sessionId={session.id} />}
       </div>
     </section>
   )

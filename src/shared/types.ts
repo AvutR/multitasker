@@ -224,6 +224,21 @@ export interface TrackerItem {
 /** @deprecated Use `TrackerItem`. Kept as a type alias for back-compat. */
 export type LinearIssue = TrackerItem
 
+/** Normalized CI/CD run status across providers (GitHub Actions, GitLab CI, …). */
+export type CIStatus = 'queued' | 'running' | 'success' | 'failure' | 'cancelled' | 'unknown'
+
+/** A recent CI/CD run for the session's repo, from any CIProvider. */
+export interface CIRun {
+  id: string
+  name: string // workflow / pipeline name
+  status: CIStatus
+  branch: string
+  url: string
+  event: string // what triggered it (push, pull_request, …)
+  createdAt: number // epoch ms
+  providerId?: string
+}
+
 export interface AppSettings {
   dryRun: boolean
   concurrencyCap: number
