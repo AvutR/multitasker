@@ -39,7 +39,7 @@ export function LinearPanel({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-ink-600 px-4 py-3">
-          <div className="text-sm font-semibold text-white">Your Linear issues</div>
+          <div className="text-sm font-semibold text-white">Your tasks</div>
           <button onClick={() => void fetchIssues(true)} className="text-xs text-accent hover:underline">
             ↻ Refresh
           </button>

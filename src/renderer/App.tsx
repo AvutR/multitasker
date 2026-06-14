@@ -8,6 +8,7 @@ import { PolicyConsole } from './components/PolicyConsole'
 import { ActivityFeed } from './components/ActivityFeed'
 import { NewSessionModal } from './components/NewSessionModal'
 import { LinearPanel } from './components/LinearPanel'
+import { CommandPalette } from './components/CommandPalette'
 
 export function App() {
   const init = useStore((s) => s.init)
@@ -18,16 +19,37 @@ export function App() {
   const openBoard = useStore((s) => s.openBoard)
   const [showNew, setShowNew] = useState(false)
   const [showLinear, setShowLinear] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
 
   useEffect(() => {
     void init()
   }, [init])
 
+  // Global keyboard home base: ⌘K palette, ⌘N new, esc steps back.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowPalette((v) => !v)
+      } else if (mod && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        setShowNew(true)
+      } else if (e.key === 'Escape') {
+        // Let an open overlay handle its own Escape; otherwise step back to the board.
+        if (showPalette || showNew || showLinear) return
+        if (view === 'session') openBoard()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showPalette, showNew, showLinear, view, openBoard])
+
   const inSession = view === 'session' && selectedId && hasSession
 
   return (
     <div className="flex h-full flex-col bg-ink-900 text-[#d7dbe3]">
-      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} />
+      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} />
       <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: 'minmax(0, 1fr) 380px' }}>
         {inSession ? (
           <section className="flex min-h-0 flex-col bg-ink-900">
@@ -49,6 +71,13 @@ export function App() {
       </div>
       {showNew && <NewSessionModal onClose={() => setShowNew(false)} />}
       {showLinear && <LinearPanel onClose={() => setShowLinear(false)} />}
+      {showPalette && (
+        <CommandPalette
+          onClose={() => setShowPalette(false)}
+          onNew={() => setShowNew(true)}
+          onTasks={() => setShowLinear(true)}
+        />
+      )}
       {!ready && (
         <div className="pointer-events-none fixed inset-0 grid place-items-center">
           <span className="rounded bg-ink-700 px-3 py-1.5 text-sm text-[#8a93a6]">Connecting to orchestrator…</span>
@@ -58,7 +87,7 @@ export function App() {
   )
 }
 
-function Header({ onNew, onLinear }: { onNew: () => void; onLinear: () => void }) {
+function Header({ onNew, onLinear, onPalette }: { onNew: () => void; onLinear: () => void; onPalette: () => void }) {
   const sessions = useStore((s) => s.sessions)
   const planRequests = useStore((s) => s.planRequests)
   const actions = useStore((s) => s.actions)
@@ -106,8 +135,16 @@ function Header({ onNew, onLinear }: { onNew: () => void; onLinear: () => void }
         >
           Dry-run {dryRun ? 'ON' : 'OFF'}
         </button>
+        <button
+          onClick={onPalette}
+          title="Command palette — jump to any session or run a command (⌘K)"
+          className="flex items-center gap-1.5 rounded bg-ink-600 px-2.5 py-1 font-medium text-[#b9c0cc] hover:bg-ink-500"
+        >
+          <span>Search</span>
+          <kbd className="rounded bg-ink-800 px-1 text-[10px] text-[#6b7280]">⌘K</kbd>
+        </button>
         <button onClick={onLinear} className="rounded bg-ink-600 px-2.5 py-1 font-medium text-[#b9c0cc] hover:bg-ink-500">
-          Linear
+          Tasks
         </button>
         <button onClick={onNew} className="rounded bg-accent px-2.5 py-1 font-semibold text-ink-900 hover:bg-[#8bbcff]">
           + New
