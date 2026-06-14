@@ -55,7 +55,7 @@ interface State {
   decideAction: (id: string, approve: boolean) => Promise<void>
   addRepo: (path: string) => Promise<void>
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>
-  fetchLinearIssues: () => Promise<void>
+  fetchLinearIssues: (force?: boolean) => Promise<void>
   startFromIssue: (issue: LinearIssue, cwd: string) => Promise<void>
 }
 
@@ -195,10 +195,10 @@ export const useStore = create<State>((set, get) => ({
   },
   reclaimIdle: async () => window.api.invoke('session:reclaimIdle'),
   undoLastCommit: async (sessionId) => window.api.invoke('git:undoLastCommit', { sessionId }),
-  fetchLinearIssues: async () => {
+  fetchLinearIssues: async (force) => {
     set({ linearLoading: true, linearError: null })
     try {
-      const issues = await window.api.invoke('linear:myIssues')
+      const issues = await window.api.invoke('linear:myIssues', { force: Boolean(force) })
       set({ myLinearIssues: issues, linearLoading: false })
     } catch (e) {
       set({ linearLoading: false, linearError: e instanceof Error ? e.message : String(e) })

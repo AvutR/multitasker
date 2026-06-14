@@ -13,6 +13,7 @@ import { commitAll, computeDiff, readRepoMeta, undoLastCommit } from '../git/Wor
 import { listDir, readFileScoped } from '../fs/fsAccess'
 import { getPreset, loadWorkflows } from '../skills/launchPresets'
 import { listModels } from '../models'
+import { TtlCache } from '../util/TtlCache'
 
 export interface AppContext {
   repos: Repositories
@@ -83,11 +84,21 @@ export function registerIpcHandlers(ctx: AppContext): void {
   // via ~/.multitasker/trackers.json. See src/main/integrations/trackers/.
   // (The IPC name `linear:myIssues` is retained for back-compat — the renderer
   // store / UI is provider-agnostic now that the data shape is TrackerItem.)
-  handle('linear:myIssues', () => getActiveTracker().listMyItems())
+  // Memory cache for the expensive reads below (tracker spawns a subprocess; CI
+  // shells out) — reopening a panel within the TTL is instant; Refresh forces.
+  const reads = new TtlCache()
+  handle('linear:myIssues', (args) => {
+    const t = getActiveTracker()
+    return reads.get(`tracker:${t.id}`, 60_000, () => t.listMyItems(), args?.force)
+  })
   handle('tracker:listProviders', () => listProviderIds())
 
   // CI/CD inbox — recent pipeline runs for the session's repo (GitHub Actions default)
-  handle('ci:recentRuns', ({ sessionId }) => getActiveCIProvider().listRecentRuns(cwdFor(sessionId)))
+  handle('ci:recentRuns', ({ sessionId, force }) => {
+    const p = getActiveCIProvider()
+    const cwd = cwdFor(sessionId)
+    return reads.get(`ci:${p.id}:${cwd}`, 30_000, () => p.listRecentRuns(cwd), force)
+  })
   handle('ci:listProviders', () => listCIProviderIds())
 
   // Models

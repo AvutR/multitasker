@@ -57,11 +57,11 @@ export interface IpcApi {
 
   // Presets / settings / repos
   // Tracker inbox (Linear is the default provider; see src/main/integrations/trackers/)
-  'linear:myIssues': () => LinearIssue[]
+  'linear:myIssues': (args?: { force?: boolean }) => LinearIssue[]
   'tracker:listProviders': () => string[]
 
   // CI/CD — recent pipeline runs for a session's repo (GitHub Actions default)
-  'ci:recentRuns': (args: { sessionId: string }) => CIRun[]
+  'ci:recentRuns': (args: { sessionId: string; force?: boolean }) => CIRun[]
   'ci:listProviders': () => string[]
 
   // Models

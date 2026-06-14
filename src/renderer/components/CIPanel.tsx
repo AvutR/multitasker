@@ -15,10 +15,10 @@ export function CIPanel({ sessionId }: { sessionId: string }) {
   const [runs, setRuns] = useState<CIRun[] | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const load = () => {
+  const load = (force = false) => {
     setLoading(true)
     window.api
-      .invoke('ci:recentRuns', { sessionId })
+      .invoke('ci:recentRuns', { sessionId, force })
       .then((r) => setRuns(r))
       .catch(() => setRuns([]))
       .finally(() => setLoading(false))
@@ -33,7 +33,7 @@ export function CIPanel({ sessionId }: { sessionId: string }) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between border-b border-ink-600 px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">CI / CD · recent runs</span>
-        <button onClick={load} className="text-[11px] text-accent hover:underline" disabled={loading}>
+        <button onClick={() => load(true)} className="text-[11px] text-accent hover:underline" disabled={loading}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
       </div>
