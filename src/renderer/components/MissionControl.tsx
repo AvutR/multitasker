@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { SessionInfo } from '@shared/types'
-import { groupSessions } from '@shared/board'
+import { groupSessions, idleSessionIds } from '@shared/board'
 import { useStore } from '../store/store'
 import { Icon } from './Icon'
 import { NeedsYouInbox } from './NeedsYouInbox'
@@ -27,6 +27,9 @@ export function MissionControl({ onNew }: { onNew: () => void }) {
   const ordered = order.map((id) => sessions[id]).filter(Boolean) as SessionInfo[]
   const groups = groupSessions(ordered)
   const total = ordered.length
+  // Only sessions that actually hold a live subprocess slot are reclaimable —
+  // the Idle lane also contains stopped-but-resumable sessions, which hold none.
+  const reclaimable = idleSessionIds(ordered).length
 
   return (
     <section className="min-h-0 flex-1 overflow-y-auto bg-ink-900 px-5 py-4">
@@ -53,9 +56,9 @@ export function MissionControl({ onNew }: { onNew: () => void }) {
             title="Idle"
             sessions={groups.idle}
             action={
-              groups.idle.length > 0 ? (
-                <button onClick={() => void reclaimIdle()} className="text-[11px] text-accent hover:underline" title="Stop idle sessions to free their concurrency slots">
-                  Reclaim {groups.idle.length} slot{groups.idle.length > 1 ? 's' : ''}
+              reclaimable > 0 ? (
+                <button onClick={() => void reclaimIdle()} className="text-[11px] text-accent hover:underline" title="Stop live idle sessions to free their concurrency slots">
+                  Reclaim {reclaimable} slot{reclaimable > 1 ? 's' : ''}
                 </button>
               ) : undefined
             }

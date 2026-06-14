@@ -53,8 +53,12 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         className="block w-full rounded-lg p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate pr-10 text-sm text-[#d7dbe3]">{session.title}</span>
-          <span className="shrink-0 text-[10px] tabular-nums text-[#5b6472]">{formatCost(session.totalCostUsd)}</span>
+          <span className="truncate pr-14 text-sm text-[#d7dbe3]">{session.title}</span>
+          {/* Fade the cost out on hover so the action icons swap into the same
+              top-right corner instead of colliding with the number. */}
+          <span className="shrink-0 text-[10px] tabular-nums text-[#5b6472] transition-opacity duration-200 group-hover:opacity-0">
+            {formatCost(session.totalCostUsd)}
+          </span>
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2">
           <StatusDot status={session.status} />
