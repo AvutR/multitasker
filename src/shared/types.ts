@@ -228,6 +228,15 @@ export interface TrackerItem {
 /** @deprecated Use `TrackerItem`. Kept as a type alias for back-compat. */
 export type LinearIssue = TrackerItem
 
+/** A note in a project's shared agent memory (remember/recall). */
+export interface MemoryNote {
+  id: string
+  text: string
+  tag?: string
+  sessionId?: string
+  createdAt: number
+}
+
 /** Normalized CI/CD run status across providers (GitHub Actions, GitLab CI, …). */
 export type CIStatus = 'queued' | 'running' | 'success' | 'failure' | 'cancelled' | 'unknown'
 

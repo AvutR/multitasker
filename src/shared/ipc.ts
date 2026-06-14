@@ -8,6 +8,7 @@ import type {
   CIRun,
   CommitResult,
   DiffFile,
+  MemoryNote,
   FileContent,
   FileEntry,
   LaunchPreset,
@@ -63,6 +64,9 @@ export interface IpcApi {
   // CI/CD — recent pipeline runs for a session's repo (GitHub Actions default)
   'ci:recentRuns': (args: { sessionId: string; force?: boolean }) => CIRun[]
   'ci:listProviders': () => string[]
+
+  // Shared agent memory for a session's project (remember/recall)
+  'memory:list': (args: { sessionId: string }) => MemoryNote[]
 
   // Models
   'models:list': () => ModelOption[]

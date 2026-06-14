@@ -5,6 +5,7 @@ import type { ActionService } from '../integrations/ActionService'
 import type { LinearService } from '../integrations/LinearService'
 import { getActiveTracker, listProviderIds } from '../integrations/trackers/registry'
 import { getActiveCIProvider, listCIProviderIds } from '../integrations/ci/registry'
+import { listMemory } from '../integrations/agentMemory'
 import type { EventBus } from '../events'
 import type { Repositories } from '../db/repositories'
 import type { SessionManager } from '../orchestrator/SessionManager'
@@ -100,6 +101,9 @@ export function registerIpcHandlers(ctx: AppContext): void {
     return reads.get(`ci:${p.id}:${cwd}`, 30_000, () => p.listRecentRuns(cwd), force)
   })
   handle('ci:listProviders', () => listCIProviderIds())
+
+  // Shared agent memory for the session's project
+  handle('memory:list', ({ sessionId }) => listMemory(cwdFor(sessionId)))
 
   // Models
   handle('models:list', () => listModels(ctx.repos.settings.get()))

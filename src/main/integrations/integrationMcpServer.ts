@@ -2,6 +2,13 @@ import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
 import type { ActionRecord } from '@shared/types'
 import type { ActionService } from './ActionService'
+import { recall, remember } from './agentMemory'
+
+export interface IntegrationServerOptions {
+  orchestration?: Orchestration
+  /** Project root used as the shared agent-memory key (the session's cwd). */
+  memoryRoot?: string
+}
 
 /** Lets a conductor session fan work out to cheaper, parallel sub-agents.
  *  Injected by SessionManager so the MCP layer has no orchestrator dependency. */
@@ -18,11 +25,35 @@ export interface Orchestration {
  * Created per session so the tool handlers can attribute actions to the right
  * session. Runs in-process within the orchestrator (Electron main).
  */
-export function createIntegrationMcpServer(actionService: ActionService, sessionId: string, orchestration?: Orchestration) {
+export function createIntegrationMcpServer(actionService: ActionService, sessionId: string, opts: IntegrationServerOptions = {}) {
+  const { orchestration, memoryRoot } = opts
   const propose = async (actionType: string, summary: string, payload: unknown) => {
     const rec = await actionService.propose({ sessionId, actionType, summary, payload })
     return toolResult(rec)
   }
+
+  const memoryTools = memoryRoot
+    ? [
+        tool(
+          'remember',
+          "Save a short note to this project's shared agent memory so you, your sub-agents, and future sessions in this repo can recall it. Use for decisions made, gotchas found, where things live, and what a delegated sub-task concluded.",
+          { text: z.string().describe('The note to remember'), tag: z.string().optional().describe('Optional short tag to group/filter by') },
+          async (args) => {
+            const n = remember(memoryRoot, args.text, args.tag, sessionId)
+            return text(`Remembered (${n.id.slice(0, 8)}).`)
+          }
+        ),
+        tool(
+          'recall',
+          "Recall notes from this project's shared agent memory (written by you, your sub-agents, or earlier sessions). Optionally filter by a query. Call this before starting work to reuse prior knowledge instead of rediscovering it.",
+          { query: z.string().optional().describe('Optional case-insensitive filter') },
+          async (args) => {
+            const notes = recall(memoryRoot, args.query)
+            return text(notes.length ? notes.map((n) => `• ${n.text}${n.tag ? ` [${n.tag}]` : ''}`).join('\n') : 'No memory yet for this project.')
+          }
+        )
+      ]
+    : []
 
   const orchestrationTools = orchestration
     ? [
@@ -52,6 +83,7 @@ export function createIntegrationMcpServer(actionService: ActionService, session
     name: 'multitasker-integrations',
     version: '0.1.0',
     tools: [
+      ...memoryTools,
       ...orchestrationTools,
       tool(
         'post_standup',

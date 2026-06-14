@@ -138,7 +138,10 @@ export class AgentSession {
   private async run(resume: { resume?: string; fork: boolean } | undefined): Promise<void> {
     const sdk = (await import('@anthropic-ai/claude-agent-sdk')) as { query: unknown }
     const query = sdk.query as LooseQuery
-    const integrationServer = createIntegrationMcpServer(this.deps.actions, this.info.id, this.deps.orchestration)
+    const integrationServer = createIntegrationMcpServer(this.deps.actions, this.info.id, {
+      orchestration: this.deps.orchestration,
+      memoryRoot: this.info.cwd // sub-agents inherit the conductor's cwd → shared memory
+    })
     this.patch({ status: 'running' })
 
     const options: Record<string, unknown> = {

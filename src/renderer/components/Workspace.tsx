@@ -7,14 +7,16 @@ import { Transcript } from './Transcript'
 import { CodeView } from './CodeView'
 import { DiffView } from './DiffView'
 import { CIPanel } from './CIPanel'
+import { MemoryPanel } from './MemoryPanel'
 import { TrustBar } from './TrustBar'
 
-type Tab = 'transcript' | 'code' | 'diff' | 'ci'
+type Tab = 'transcript' | 'code' | 'diff' | 'ci' | 'memory'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'transcript', label: 'Transcript' },
   { id: 'code', label: 'Code' },
   { id: 'diff', label: 'Diff' },
-  { id: 'ci', label: 'CI/CD' }
+  { id: 'ci', label: 'CI/CD' },
+  { id: 'memory', label: 'Memory' }
 ]
 
 export function Workspace() {
@@ -87,6 +89,7 @@ export function Workspace() {
         {tab === 'code' && <CodeView sessionId={session.id} />}
         {tab === 'diff' && <DiffView sessionId={session.id} />}
         {tab === 'ci' && <CIPanel sessionId={session.id} />}
+        {tab === 'memory' && <MemoryPanel sessionId={session.id} />}
       </div>
     </section>
   )
