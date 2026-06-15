@@ -93,5 +93,12 @@ export const MIGRATIONS: Migration[] = [
   {
     name: '0004_session_parent',
     sql: `ALTER TABLE sessions ADD COLUMN parent_id TEXT;`
+  },
+  {
+    name: '0005_session_tokens',
+    sql: `
+      ALTER TABLE sessions ADD COLUMN input_tokens  INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN output_tokens INTEGER NOT NULL DEFAULT 0;
+    `
   }
 ]

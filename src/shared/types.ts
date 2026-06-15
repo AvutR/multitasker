@@ -39,6 +39,9 @@ export interface SessionInfo {
   presetId: string | null
   totalCostUsd: number
   numTurns: number
+  /** Token usage for the session (input incl. cache, and output), when the SDK reports it. */
+  inputTokens?: number
+  outputTokens?: number
   createdAt: number
   updatedAt: number
   error: string | null
@@ -258,6 +261,8 @@ export interface AppSettings {
   defaultModel: string // a ModelOption id (see main/models.ts)
   /** Model id used for delegated sub-agents — cheaper than the conductor's. */
   delegateModel?: string
+  /** Soft spend cap (USD) for the budget guardrail. 0/undefined = no budget. */
+  budgetUsd?: number
   // Optional Anthropic-compatible gateway for non-Anthropic providers
   // (LiteLLM / OpenRouter / Bedrock-proxy / etc.).
   gatewayBaseUrl?: string

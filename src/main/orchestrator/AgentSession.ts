@@ -263,12 +263,19 @@ export class AgentSession {
         const cost = typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : this.info.totalCostUsd
         const turns = typeof msg.num_turns === 'number' ? msg.num_turns : this.info.numTurns
         const subtype = typeof msg.subtype === 'string' ? msg.subtype : 'success'
+        const { input, output } = extractTokens(msg.usage)
         this.persist('result', [{ type: 'text', text: resultText(subtype, msg.result) }], {
           resultSubtype: subtype,
           costUsd: cost
         })
         const status = this.info.status === 'landed' ? 'landed' : 'awaiting_input'
-        this.patch({ totalCostUsd: cost, numTurns: turns, status })
+        this.patch({
+          totalCostUsd: cost,
+          numTurns: turns,
+          inputTokens: input ?? this.info.inputTokens,
+          outputTokens: output ?? this.info.outputTokens,
+          status
+        })
         break
       }
       default:
@@ -299,6 +306,17 @@ export class AgentSession {
 
 function userMessage(text: string): unknown {
   return { type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null, session_id: '' }
+}
+
+// Defensively pull token counts out of the SDK result's `usage` (untyped edge).
+// Input includes cache read/creation tokens — those are real billed input.
+function extractTokens(usage: unknown): { input: number | null; output: number | null } {
+  if (!usage || typeof usage !== 'object') return { input: null, output: null }
+  const u = usage as Record<string, unknown>
+  const num = (v: unknown) => (typeof v === 'number' ? v : 0)
+  const input = num(u.input_tokens) + num(u.cache_read_input_tokens) + num(u.cache_creation_input_tokens)
+  const output = num(u.output_tokens)
+  return { input: input || null, output: output || null }
 }
 
 function resultText(subtype: string, result: unknown): string {

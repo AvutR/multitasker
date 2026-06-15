@@ -9,6 +9,7 @@ import { ActivityFeed } from './components/ActivityFeed'
 import { NewSessionModal } from './components/NewSessionModal'
 import { LinearPanel } from './components/LinearPanel'
 import { CommandPalette } from './components/CommandPalette'
+import { CostObservatory } from './components/CostObservatory'
 
 export function App() {
   const init = useStore((s) => s.init)
@@ -20,6 +21,7 @@ export function App() {
   const [showNew, setShowNew] = useState(false)
   const [showLinear, setShowLinear] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
+  const [showCost, setShowCost] = useState(false)
 
   useEffect(() => {
     void init()
@@ -49,7 +51,7 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-ink-900 text-[#d7dbe3]">
-      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} />
+      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} onCost={() => setShowCost(true)} />
       <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: 'minmax(0, 1fr) 380px' }}>
         {inSession ? (
           <section className="flex min-h-0 flex-col bg-ink-900">
@@ -76,8 +78,10 @@ export function App() {
           onClose={() => setShowPalette(false)}
           onNew={() => setShowNew(true)}
           onTasks={() => setShowLinear(true)}
+          onCost={() => setShowCost(true)}
         />
       )}
+      {showCost && <CostObservatory onClose={() => setShowCost(false)} />}
       {!ready && (
         <div className="pointer-events-none fixed inset-0 grid place-items-center">
           <span className="rounded bg-ink-700 px-3 py-1.5 text-sm text-[#8a93a6]">Connecting to orchestrator…</span>
@@ -87,13 +91,14 @@ export function App() {
   )
 }
 
-function Header({ onNew, onLinear, onPalette }: { onNew: () => void; onLinear: () => void; onPalette: () => void }) {
+function Header({ onNew, onLinear, onPalette, onCost }: { onNew: () => void; onLinear: () => void; onPalette: () => void; onCost: () => void }) {
   const sessions = useStore((s) => s.sessions)
   const planRequests = useStore((s) => s.planRequests)
   const actions = useStore((s) => s.actions)
   const dryRun = useStore((s) => s.policy.dryRun)
   const setDryRun = useStore((s) => s.setDryRun)
   const cap = useStore((s) => s.settings.concurrencyCap)
+  const budgetUsd = useStore((s) => s.settings.budgetUsd)
   const patchSettings = useStore((s) => s.patchSettings)
   const openBoard = useStore((s) => s.openBoard)
 
@@ -102,6 +107,9 @@ function Header({ onNew, onLinear, onPalette }: { onNew: () => void; onLinear: (
   const queued = list.filter((s) => s.status === 'queued').length
   const cost = list.reduce((sum, s) => sum + s.totalCostUsd, 0)
   const needsYou = rankNeedsYou(list, Object.values(planRequests), actions).length
+  // Budget guardrail: warn as spend approaches/exceeds the soft cap.
+  const budgetPct = budgetUsd && budgetUsd > 0 ? (cost / budgetUsd) * 100 : null
+  const costTone = budgetPct == null ? 'text-[#8a93a6]' : budgetPct >= 100 ? 'text-[#f06d6d]' : budgetPct >= 80 ? 'text-[#f5a623]' : 'text-[#8a93a6]'
 
   return (
     <header className="drag flex h-12 shrink-0 items-center justify-between border-b border-ink-600 bg-ink-800 pl-20 pr-3">
@@ -127,7 +135,14 @@ function Header({ onNew, onLinear, onPalette }: { onNew: () => void; onLinear: (
             +
           </button>
         </span>
-        <span className="tabular-nums">{formatCost(cost)}</span>
+        <button
+          onClick={onCost}
+          title={budgetPct == null ? 'Cost & token observatory' : `${budgetPct.toFixed(0)}% of budget — open the observatory`}
+          className={`flex items-center gap-1 rounded px-1.5 py-1 tabular-nums hover:bg-ink-700 ${costTone}`}
+        >
+          {budgetPct != null && budgetPct >= 80 && <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'currentColor' }} />}
+          {formatCost(cost)}
+        </button>
         <button
           onClick={() => void setDryRun(!dryRun)}
           title="Global dry-run: when ON, no action ever hits a live connector."

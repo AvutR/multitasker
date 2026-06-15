@@ -16,7 +16,7 @@ interface Command {
  * (new session, toggle dry-run, go to board, open tasks) AND every live
  * session (jump by title). ↑/↓ to move, ↵ to run, esc to close.
  */
-export function CommandPalette({ onClose, onNew, onTasks }: { onClose: () => void; onNew: () => void; onTasks: () => void }) {
+export function CommandPalette({ onClose, onNew, onTasks, onCost }: { onClose: () => void; onNew: () => void; onTasks: () => void; onCost: () => void }) {
   const sessions = useStore((s) => s.sessions)
   const order = useStore((s) => s.order)
   const select = useStore((s) => s.select)
@@ -38,6 +38,7 @@ export function CommandPalette({ onClose, onNew, onTasks }: { onClose: () => voi
       { id: 'new', label: 'New session', hint: '⌘N', run: run(onNew) },
       { id: 'board', label: 'Go to Mission Control', hint: 'esc', run: run(openBoard) },
       { id: 'tasks', label: 'Open Tasks (tracker inbox)', run: run(onTasks) },
+      { id: 'cost', label: 'Cost & token observatory', run: run(onCost) },
       { id: 'dryrun', label: `Turn dry-run ${dryRun ? 'OFF' : 'ON'}`, hint: dryRun ? 'live actions' : 'safe', run: run(() => void setDryRun(!dryRun)) }
     ]
     const sessionCmds: Command[] = order
@@ -51,7 +52,7 @@ export function CommandPalette({ onClose, onNew, onTasks }: { onClose: () => voi
         run: run(() => void select(s.id))
       }))
     return [...actions, ...sessionCmds]
-  }, [sessions, order, dryRun, onNew, onTasks, openBoard, select, setDryRun, onClose])
+  }, [sessions, order, dryRun, onNew, onTasks, onCost, openBoard, select, setDryRun, onClose])
 
   const filtered = useMemo(() => fuzzyFilter(query, commands, (c) => c.label).slice(0, 40), [query, commands])
   useEffect(() => setActive(0), [query])
