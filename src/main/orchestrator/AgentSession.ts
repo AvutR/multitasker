@@ -79,18 +79,18 @@ export class AgentSession {
 
   /**
    * Resume (or fork) an existing SDK session.
-   *  - fork, or resume WITH a prompt: begins work immediately with that prompt.
-   *  - bare resume (no prompt): a "wake". We reattach the SDK session but feed it
-   *    NO message, so the run loop parks on the open queue in `awaiting_input`.
-   *    Nothing runs until the user steers — their first message is what starts
-   *    the work, in the fully-resumed context. Mirrors the no-autostart rule we
-   *    apply to tracker issues: no action without a prompt from the user.
+   *  Resuming in place or forking, supplying NO prompt is a "wake": we reattach
+   *  (fork: branch) the SDK session but feed it NO message, so the run loop parks
+   *  on the open queue in `awaiting_input`. Nothing runs until the user steers —
+   *  their first message is what starts the work, in the fully-resumed context.
+   *  Mirrors the no-autostart rule for tracker issues: no action without a prompt
+   *  from the user. (A non-empty prompt — not used by the UI today — runs at once.)
    */
   resume(prompt: string, fork: boolean): void {
     this.queue = new AsyncQueue<unknown>()
     this.abort = new AbortController()
-    const wake = !fork && prompt.trim().length === 0
-    if (!wake) this.queue.push(userMessage(prompt || 'Continue where you left off.'))
+    const wake = prompt.trim().length === 0
+    if (!wake) this.queue.push(userMessage(prompt))
     this.donePromise = this.run({ resume: this.info.sdkSessionId ?? undefined, fork, wake })
   }
 
@@ -160,8 +160,8 @@ export class AgentSession {
       orchestration: this.deps.orchestration,
       memoryRoot
     })
-    // A bare resume "wakes" the session: it parks here in awaiting_input until the
-    // user steers. Every other run begins working immediately.
+    // A wake (bare resume or fork) parks here in awaiting_input until the user
+    // steers; every other run begins working immediately.
     this.patch({ status: resume?.wake ? 'awaiting_input' : 'running' })
 
     const options: Record<string, unknown> = {

@@ -272,7 +272,28 @@ describe('resume wakes the session — it runs only when the user steers', () =>
     expect(session.snapshot().status).toBe('completed')
   })
 
-  it('resume WITH a prompt still runs immediately (fork / explicit continue)', async () => {
+  it('fork also wakes: it parks until the user steers (no branch-and-run)', async () => {
+    const { repos, bus, actions } = deps()
+    const counter = { n: 0 }
+    h.queryImpl = runsOnInput(counter)
+
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+
+    // fork() reaches AgentSession as resume('', fork=true) — a no-prompt wake.
+    session.resume('', true)
+    for (let i = 0; i < 50 && session.snapshot().status !== 'awaiting_input'; i++) {
+      await new Promise((r) => setTimeout(r, 2))
+    }
+    expect(session.snapshot().status).toBe('awaiting_input')
+    expect(counter.n).toBe(0) // branched but parked — nothing ran
+
+    session.steer('explore the alternative')
+    await session.whenDone()
+    expect(counter.n).toBe(1)
+  })
+
+  it('an explicit (non-empty) prompt still runs immediately', async () => {
     const { repos, bus, actions } = deps()
     const counter = { n: 0 }
     h.queryImpl = runsOnInput(counter)
