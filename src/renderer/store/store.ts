@@ -56,7 +56,6 @@ interface State {
   addRepo: (path: string) => Promise<void>
   patchSettings: (patch: Partial<AppSettings>) => Promise<void>
   fetchLinearIssues: (force?: boolean) => Promise<void>
-  startFromIssue: (issue: LinearIssue, cwd: string) => Promise<void>
 }
 
 const MAX_MESSAGES = 1000 // per-session transcript retained in memory (full history in SQLite)
@@ -206,28 +205,8 @@ export const useStore = create<State>((set, get) => ({
     } catch (e) {
       set({ linearLoading: false, linearError: e instanceof Error ? e.message : String(e) })
     }
-  },
-  startFromIssue: async (issue, cwd) => {
-    await get().spawn({
-      prompt: `${issue.identifier} — ${issue.title}\n\n${issue.description ?? ''}`.trim(),
-      cwd,
-      presetId: 'build',
-      title: `${issue.identifier} ${issue.title}`.slice(0, 80),
-      linearIssueId: issue.id,
-      notionPageId: extractNotionUrl(issue.description),
-      branchName: issue.branchName,
-      useWorktree: true
-    })
   }
 }))
-
-/** Pull a Notion page URL out of an issue description so lifecycle updates can
- *  keep the linked spec current too. */
-function extractNotionUrl(text?: string): string | undefined {
-  if (!text) return undefined
-  const m = text.match(/https?:\/\/(?:www\.)?notion\.so\/[^\s)]+/i)
-  return m?.[0]
-}
 
 function applyEvent(
   set: (fn: (st: State) => Partial<State>) => void,

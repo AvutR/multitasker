@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import type { SpawnRequest } from '@shared/types'
 import { routePreset } from '@shared/taskRouter'
 import { useStore } from '../store/store'
 
-export function NewSessionModal({ onClose }: { onClose: () => void }) {
+export function NewSessionModal({ onClose, initial }: { onClose: () => void; initial?: Partial<SpawnRequest> }) {
   const presets = useStore((s) => s.presets)
   const repos = useStore((s) => s.repos)
   const models = useStore((s) => s.models)
@@ -10,20 +11,25 @@ export function NewSessionModal({ onClose }: { onClose: () => void }) {
   const spawn = useStore((s) => s.spawn)
   const addRepo = useStore((s) => s.addRepo)
 
-  const [presetId, setPresetId] = useState('auto')
-  const [model, setModel] = useState(defaultModel)
-  const [cwd, setCwd] = useState(repos[0]?.path ?? '')
+  const [presetId, setPresetId] = useState(initial?.presetId ?? 'auto')
+  const [model, setModel] = useState(initial?.model ?? defaultModel)
+  const [cwd, setCwd] = useState(initial?.cwd ?? repos[0]?.path ?? '')
   const [newRepoPath, setNewRepoPath] = useState('')
-  const [prompt, setPrompt] = useState('')
-  const [title, setTitle] = useState('')
+  const [prompt, setPrompt] = useState(initial?.prompt ?? '')
+  const [title, setTitle] = useState(initial?.title ?? '')
   const [busy, setBusy] = useState(false)
 
+  // Carried (not edited): when starting from a tracker issue these come pre-set
+  // and ride through to spawn so the branch/worktree still happen.
+  const branchName = initial?.branchName
+  const useWorktree = initial?.useWorktree
+
   // Optional automation links (lifecycle updates on other apps).
-  const [showLinks, setShowLinks] = useState(false)
-  const [linearIssueId, setLinearIssueId] = useState('')
-  const [notionPageId, setNotionPageId] = useState('')
-  const [slackChannel, setSlackChannel] = useState('')
-  const [autoUpdates, setAutoUpdates] = useState(true)
+  const [linearIssueId, setLinearIssueId] = useState(initial?.linearIssueId ?? '')
+  const [notionPageId, setNotionPageId] = useState(initial?.notionPageId ?? '')
+  const [slackChannel, setSlackChannel] = useState(initial?.slackChannel ?? '')
+  const [autoUpdates, setAutoUpdates] = useState(initial?.autoUpdates ?? true)
+  const [showLinks, setShowLinks] = useState(Boolean(initial?.linearIssueId || initial?.notionPageId))
 
   const preset = presets.find((p) => p.id === presetId)
   const canSubmit = prompt.trim().length > 0 && cwd.trim().length > 0 && !busy
@@ -41,7 +47,9 @@ export function NewSessionModal({ onClose }: { onClose: () => void }) {
         linearIssueId: linearIssueId.trim() || undefined,
         notionPageId: notionPageId.trim() || undefined,
         slackChannel: slackChannel.trim() || undefined,
-        autoUpdates
+        autoUpdates,
+        branchName,
+        useWorktree
       })
       onClose()
     } finally {

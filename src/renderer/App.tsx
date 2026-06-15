@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { SpawnRequest } from '@shared/types'
 import { rankNeedsYou } from '@shared/board'
 import { useStore } from './store/store'
 import { formatCost } from './components/bits'
@@ -24,6 +25,12 @@ export function App() {
   const [showPalette, setShowPalette] = useState(false)
   const [showCost, setShowCost] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  // Pre-fill for the New Session composer (e.g. starting from a tracker issue).
+  const [newPrefill, setNewPrefill] = useState<Partial<SpawnRequest> | undefined>(undefined)
+  const openNew = (prefill?: Partial<SpawnRequest>) => {
+    setNewPrefill(prefill)
+    setShowNew(true)
+  }
 
   useEffect(() => {
     void init()
@@ -38,7 +45,7 @@ export function App() {
         setShowPalette((v) => !v)
       } else if (mod && e.key.toLowerCase() === 'n') {
         e.preventDefault()
-        setShowNew(true)
+        openNew()
       } else if (e.key === 'Escape') {
         // Escape closes the topmost overlay; only steps back to the board when none is open.
         if (showPalette) return // the palette input handles its own Escape
@@ -59,7 +66,7 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-ink-900 text-[#d7dbe3]">
-      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} onCost={() => setShowCost(true)} onSettings={() => setShowSettings(true)} />
+      <Header onNew={() => openNew()} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} onCost={() => setShowCost(true)} onSettings={() => setShowSettings(true)} />
       <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: 'minmax(0, 1fr) 380px' }}>
         {inSession ? (
           <section className="flex min-h-0 flex-col bg-ink-900">
@@ -72,19 +79,35 @@ export function App() {
             <Workspace />
           </section>
         ) : (
-          <MissionControl onNew={() => setShowNew(true)} />
+          <MissionControl onNew={() => openNew()} />
         )}
         <aside className="flex min-h-0 flex-col border-l border-ink-600 bg-ink-900">
           <PolicyConsole />
           <ActivityFeed />
         </aside>
       </div>
-      {showNew && <NewSessionModal onClose={() => setShowNew(false)} />}
-      {showLinear && <LinearPanel onClose={() => setShowLinear(false)} />}
+      {showNew && (
+        <NewSessionModal
+          initial={newPrefill}
+          onClose={() => {
+            setShowNew(false)
+            setNewPrefill(undefined)
+          }}
+        />
+      )}
+      {showLinear && (
+        <LinearPanel
+          onClose={() => setShowLinear(false)}
+          onStart={(prefill) => {
+            setShowLinear(false)
+            openNew(prefill)
+          }}
+        />
+      )}
       {showPalette && (
         <CommandPalette
           onClose={() => setShowPalette(false)}
-          onNew={() => setShowNew(true)}
+          onNew={() => openNew()}
           onTasks={() => setShowLinear(true)}
           onCost={() => setShowCost(true)}
           onSettings={() => setShowSettings(true)}

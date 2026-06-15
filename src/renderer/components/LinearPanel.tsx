@@ -1,35 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import type { SpawnRequest } from '@shared/types'
+import { issueToPrefill } from '@shared/issuePrefill'
 import { useStore } from '../store/store'
 import { Badge } from './bits'
 
-export function LinearPanel({ onClose }: { onClose: () => void }) {
+/**
+ * The tracker inbox: your assigned issues. Picking one does NOT start work — it
+ * opens the New Session composer pre-filled with the issue's context, branch,
+ * and links, so you can review, add steering, and spawn when ready. Nothing runs
+ * without your go-ahead.
+ */
+export function LinearPanel({ onClose, onStart }: { onClose: () => void; onStart: (prefill: Partial<SpawnRequest>) => void }) {
   const issues = useStore((s) => s.myLinearIssues)
   const loading = useStore((s) => s.linearLoading)
   const error = useStore((s) => s.linearError)
   const fetchIssues = useStore((s) => s.fetchLinearIssues)
-  const startFromIssue = useStore((s) => s.startFromIssue)
   const order = useStore((s) => s.order)
   const sessions = useStore((s) => s.sessions)
   const repos = useStore((s) => s.repos)
 
-  // Directory automation: default to the most-recently-used working dir.
-  const [cwd, setCwd] = useState(sessions[order[0]]?.cwd ?? repos[0]?.path ?? '')
-  const [busy, setBusy] = useState<string | null>(null)
+  // Default the composer's working directory to the most-recently-used repo.
+  const defaultCwd = sessions[order[0]]?.cwd ?? repos[0]?.path ?? ''
 
   useEffect(() => {
     void fetchIssues()
   }, [fetchIssues])
 
-  const start = async (key: string) => {
+  const setUp = (key: string) => {
     const issue = issues.find((i) => (i.id || i.identifier) === key)
-    if (!issue || !cwd.trim()) return
-    setBusy(key)
-    try {
-      await startFromIssue(issue, cwd.trim())
-      onClose()
-    } finally {
-      setBusy(null)
-    }
+    if (!issue) return
+    onStart({ ...issueToPrefill(issue), cwd: defaultCwd || undefined })
   }
 
   return (
@@ -39,33 +39,18 @@ export function LinearPanel({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-ink-600 px-4 py-3">
-          <div className="text-sm font-semibold text-white">Your tasks</div>
+          <div>
+            <div className="text-sm font-semibold text-white">Your tasks</div>
+            <div className="text-[11px] text-[#6b7280]">Picking one opens the composer — it doesn’t start work until you spawn.</div>
+          </div>
           <button onClick={() => void fetchIssues(true)} className="text-xs text-accent hover:underline">
             ↻ Refresh
           </button>
         </div>
 
-        <div className="border-b border-ink-600 px-4 py-2">
-          <label className="mb-1 block text-[11px] uppercase tracking-wide text-[#6b7280]">
-            Working directory — a branch is auto-created per issue
-          </label>
-          <input
-            list="repo-paths-linear"
-            value={cwd}
-            onChange={(e) => setCwd(e.target.value)}
-            placeholder="/absolute/path/to/repo"
-            className="w-full rounded border border-ink-500 bg-ink-700 px-2 py-1.5 font-mono text-xs"
-          />
-          <datalist id="repo-paths-linear">
-            {repos.map((r) => (
-              <option key={r.id} value={r.path} />
-            ))}
-          </datalist>
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {loading && (
-            <div className="px-2 py-8 text-center text-xs text-[#6b7280]">Fetching your assigned issues from Linear…</div>
+            <div className="px-2 py-8 text-center text-xs text-[#6b7280]">Fetching your assigned issues…</div>
           )}
           {error && <div className="px-2 py-6 text-center text-xs text-[#f06d6d]">{error}</div>}
           {!loading && !error && issues.length === 0 && (
@@ -87,11 +72,10 @@ export function LinearPanel({ onClose }: { onClose: () => void }) {
                   <div className="truncate font-mono text-[10px] text-[#5b6472]">⎇ {i.branchName}</div>
                 </div>
                 <button
-                  onClick={() => void start(key)}
-                  disabled={busy !== null || !cwd.trim()}
-                  className="shrink-0 rounded bg-accent px-2.5 py-1 text-xs font-semibold text-ink-900 disabled:opacity-40 hover:bg-[#8bbcff]"
+                  onClick={() => setUp(key)}
+                  className="shrink-0 rounded bg-accent px-2.5 py-1 text-xs font-semibold text-ink-900 hover:bg-[#8bbcff]"
                 >
-                  {busy === key ? 'Starting…' : 'Start work →'}
+                  New session →
                 </button>
               </div>
             )
