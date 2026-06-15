@@ -101,8 +101,8 @@ export function NeedsYouInbox() {
             )}
             {item.kind === 'error' && (
               <>
-                <button onClick={() => void resume(item.sessionId)} title="Retry — resume this session" className="inline-flex items-center gap-1 rounded border border-[#5bd4a4]/40 px-2 py-1 text-[11px] font-medium text-[#5bd4a4] transition-colors hover:bg-[#5bd4a4]/10">
-                  <Icon name="resume" /> Retry
+                <button onClick={() => void resume(item.sessionId)} title="Resume — wake this session so you can add a fix and steer it; it won't rerun on its own" className="inline-flex items-center gap-1 rounded border border-[#5bd4a4]/40 px-2 py-1 text-[11px] font-medium text-[#5bd4a4] transition-colors hover:bg-[#5bd4a4]/10">
+                  <Icon name="resume" /> Resume
                 </button>
                 <button onClick={() => void select(item.sessionId)} className="rounded border border-ink-500 px-2 py-1 text-[11px] text-[#b9c0cc] hover:bg-ink-700">
                   Open

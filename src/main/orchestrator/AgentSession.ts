@@ -39,10 +39,11 @@ type LooseQuery = (args: { prompt: unknown; options: Record<string, unknown> }) 
 export class AgentSession {
   readonly id: string
   private info: SessionInfo
-  // Recreated on each start/resume — AsyncQueue.close() latches permanently,
-  // so a stopped session needs a fresh queue to run again.
+  // Recreated on each start/resume — both latch permanently once torn down
+  // (AsyncQueue.close() closes for good; AbortController.abort() stays aborted),
+  // so a stopped session needs a fresh queue AND a fresh controller to run again.
   private queue = new AsyncQueue<unknown>()
-  private readonly abort = new AbortController()
+  private abort = new AbortController()
   private readonly gate: (toolName: string, input: Record<string, unknown>) => Promise<GateDecision>
   private planResolver: ((d: PlanDecision) => void) | null = null
   private donePromise: Promise<void> = Promise.resolve()
@@ -71,17 +72,26 @@ export class AgentSession {
   /** Begin the run with an initial prompt (fresh spawn). */
   start(prompt: string): void {
     this.queue = new AsyncQueue<unknown>()
+    this.abort = new AbortController()
     this.queue.push(userMessage(prompt))
     this.donePromise = this.run(undefined)
   }
 
-  /** Resume (or fork) an existing SDK session, optionally with a new prompt. */
+  /**
+   * Resume (or fork) an existing SDK session.
+   *  - fork, or resume WITH a prompt: begins work immediately with that prompt.
+   *  - bare resume (no prompt): a "wake". We reattach the SDK session but feed it
+   *    NO message, so the run loop parks on the open queue in `awaiting_input`.
+   *    Nothing runs until the user steers — their first message is what starts
+   *    the work, in the fully-resumed context. Mirrors the no-autostart rule we
+   *    apply to tracker issues: no action without a prompt from the user.
+   */
   resume(prompt: string, fork: boolean): void {
     this.queue = new AsyncQueue<unknown>()
-    // An empty prompt would park the run on an open, never-fed queue; supply a
-    // continuation so resume/fork actually advance.
-    this.queue.push(userMessage(prompt || 'Continue where you left off.'))
-    this.donePromise = this.run({ resume: this.info.sdkSessionId ?? undefined, fork })
+    this.abort = new AbortController()
+    const wake = !fork && prompt.trim().length === 0
+    if (!wake) this.queue.push(userMessage(prompt || 'Continue where you left off.'))
+    this.donePromise = this.run({ resume: this.info.sdkSessionId ?? undefined, fork, wake })
   }
 
   steer(text: string): void {
@@ -136,7 +146,11 @@ export class AgentSession {
 
   // --- run loop ------------------------------------------------------------
 
-  private async run(resume: { resume?: string; fork: boolean } | undefined): Promise<void> {
+  private async run(resume: { resume?: string; fork: boolean; wake?: boolean } | undefined): Promise<void> {
+    // Capture THIS run's controller synchronously (start/resume just made a fresh
+    // one). A still-unwinding prior run keeps its own captured controller, so the
+    // catch below classifies stop-vs-error against the right signal.
+    const abort = this.abort
     const sdk = (await import('@anthropic-ai/claude-agent-sdk')) as { query: unknown }
     const query = sdk.query as LooseQuery
     // Key memory by the PROJECT root (not the worktree), so a conductor, its
@@ -146,7 +160,9 @@ export class AgentSession {
       orchestration: this.deps.orchestration,
       memoryRoot
     })
-    this.patch({ status: 'running' })
+    // A bare resume "wakes" the session: it parks here in awaiting_input until the
+    // user steers. Every other run begins working immediately.
+    this.patch({ status: resume?.wake ? 'awaiting_input' : 'running' })
 
     const options: Record<string, unknown> = {
       cwd: this.info.cwd,
@@ -155,7 +171,7 @@ export class AgentSession {
       // every session — this is what makes Claude Code skills available by default.
       settingSources: ['user', 'project', 'local'],
       includePartialMessages: true,
-      abortController: this.abort,
+      abortController: abort,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: this.launch.systemPromptAppend },
       // createSdkMcpServer already returns the full { type:'sdk', name, instance }
       // config — pass it through directly. Wrapping it again points `.instance`
@@ -191,7 +207,7 @@ export class AgentSession {
         this.patch({ status: 'completed' })
       }
     } catch (err) {
-      if (this.abort.signal.aborted) {
+      if (abort.signal.aborted) {
         this.patch({ status: 'stopped' })
         return
       }

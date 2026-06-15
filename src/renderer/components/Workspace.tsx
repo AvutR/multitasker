@@ -69,7 +69,7 @@ export function Workspace() {
           {isRevivableStatus(session.status) && (
             <button
               onClick={() => void resume(session.id)}
-              title="Resume — continue this session where it left off"
+              title="Resume — wake this session with its full context; it waits for your prompt before doing anything"
               className="inline-flex items-center gap-1.5 rounded border border-[#5bd4a4]/40 px-2.5 py-1 text-xs font-medium text-[#5bd4a4] transition-colors hover:bg-[#5bd4a4]/10"
             >
               <Icon name="resume" /> Resume

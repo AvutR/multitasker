@@ -227,31 +227,64 @@ describe('SessionManager concurrency cap', () => {
   })
 })
 
-describe('resume after stop uses a fresh queue', () => {
-  it('a stopped session runs again on resume (closed-queue regression)', async () => {
+describe('resume wakes the session — it runs only when the user steers', () => {
+  // A query that runs a turn ONLY once it receives an input message. A bare
+  // resume must not feed the queue, so this stays parked until the user steers.
+  const runsOnInput = (counter: { n: number }) => (args: { prompt: unknown; options: Record<string, unknown> }) =>
+    (async function* () {
+      const iterator = (args.prompt as AsyncIterable<unknown>)[Symbol.asyncIterator]()
+      const first = await iterator.next()
+      if (!first.done) {
+        counter.n += 1
+        yield { type: 'system', session_id: 'sdk-r' }
+        yield { type: 'result', subtype: 'success', total_cost_usd: 0 }
+      }
+    })()
+
+  it('bare resume parks in awaiting_input (no auto-run); the steer starts the work', async () => {
     const { repos, bus, actions } = deps()
-    let runs = 0
-    h.queryImpl = (args) =>
-      (async function* () {
-        // Only proceed if we actually receive an input message — a closed/empty
-        // prompt queue (the bug) would yield nothing and never increment `runs`.
-        const iterator = (args.prompt as AsyncIterable<unknown>)[Symbol.asyncIterator]()
-        const first = await iterator.next()
-        if (!first.done) {
-          runs += 1
-          yield { type: 'system', session_id: 'sdk-r' }
-          yield { type: 'result', subtype: 'success', total_cost_usd: 0 }
-        }
-      })()
+    const counter = { n: 0 }
+    h.queryImpl = runsOnInput(counter)
+
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+
+    // First run, then stop — this both closes the queue AND aborts the
+    // controller, so resume must rebuild both to run again (fresh-queue/-abort
+    // regression).
+    session.start('first')
+    await session.whenDone()
+    expect(counter.n).toBe(1)
+    session.stop()
+
+    // Wake: reattach with NO prompt. The run loop parks; nothing runs yet.
+    session.resume('', false)
+    for (let i = 0; i < 50 && session.snapshot().status !== 'awaiting_input'; i++) {
+      await new Promise((r) => setTimeout(r, 2))
+    }
+    expect(session.snapshot().status).toBe('awaiting_input')
+    expect(counter.n).toBe(1) // still parked — the user hasn't steered
+
+    // The user's first message is what actually starts the work.
+    session.steer('now do it')
+    await session.whenDone()
+    expect(counter.n).toBe(2)
+    expect(session.snapshot().status).toBe('completed')
+  })
+
+  it('resume WITH a prompt still runs immediately (fork / explicit continue)', async () => {
+    const { repos, bus, actions } = deps()
+    const counter = { n: 0 }
+    h.queryImpl = runsOnInput(counter)
 
     const info = makeInfo(repos)
     const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
     session.start('first')
     await session.whenDone()
     session.stop()
-    session.resume('second', false)
+    session.resume('keep going', false)
     await session.whenDone()
-    expect(runs).toBe(2)
+    expect(counter.n).toBe(2)
   })
 })
 

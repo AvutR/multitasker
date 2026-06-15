@@ -14,7 +14,8 @@ export function SessionCard({ session }: { session: SessionInfo }) {
   const presets = useStore((s) => s.presets)
   const presetName = presets.find((p) => p.id === session.presetId)?.name ?? session.presetId ?? ''
   const needsYou = session.status === 'error' || session.status === 'awaiting_plan_approval'
-  // A non-live session (Done-lane card) can be revived — resume continues its run.
+  // A non-live session (Done-lane card) can be woken — resume reattaches its
+  // context and waits for the user's prompt (it does not auto-run).
   const revivable = isRevivableStatus(session.status)
   // A live session (running/queued/idle) can be closed out as done.
   const canMarkDone = session.status === 'running' || session.status === 'queued' || session.status === 'awaiting_input'
@@ -85,7 +86,7 @@ export function SessionCard({ session }: { session: SessionInfo }) {
         {revivable && (
           <button
             onClick={onResume}
-            title="Resume — continue this session"
+            title="Resume — wake this session; it waits for your prompt before doing anything"
             aria-label="Resume session"
             className="inline-flex items-center justify-center rounded p-1 text-[#8a93a6] opacity-0 transition-opacity duration-200 hover:bg-ink-600 hover:text-[#5bd4a4] group-hover:opacity-100"
           >
