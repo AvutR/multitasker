@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { DiffFile } from '@shared/types'
+import type { DiffFile, DiffStatus } from '@shared/types'
 import { computeBlastRadius } from '../../src/shared/blastRadius'
 
-function file(relPath: string, additions = 5, deletions = 2): DiffFile {
-  return { relPath, status: 'modified', additions, deletions, oldContent: '', newContent: '' }
+function file(relPath: string, additions = 5, deletions = 2, status: DiffStatus = 'modified'): DiffFile {
+  return { relPath, status, additions, deletions, oldContent: '', newContent: '' }
 }
 
 describe('computeBlastRadius', () => {
@@ -64,5 +64,51 @@ describe('computeBlastRadius', () => {
   it('treats a root-level file as the (root) subsystem', () => {
     const b = computeBlastRadius([file('README.md')])
     expect(b.subsystems).toEqual(['(root)'])
+  })
+})
+
+describe('computeBlastRadius — in-depth signals', () => {
+  it('flags a test gap when source changes but no tests do', () => {
+    expect(computeBlastRadius([file('src/main/foo.ts', 40, 5)]).testGap).toBe(true)
+    expect(computeBlastRadius([file('docs/readme.md')]).testGap).toBe(false) // non-source change
+  })
+
+  it('clears the test gap when a test file is part of the change', () => {
+    const b = computeBlastRadius([file('src/main/foo.ts', 40, 5), file('tests/foo.test.ts', 20, 0)])
+    expect(b.testGap).toBe(false)
+  })
+
+  it('counts deleted files', () => {
+    const b = computeBlastRadius([
+      file('src/a.ts', 0, 30, 'deleted'),
+      file('src/b.ts', 0, 12, 'deleted'),
+      file('src/c.ts', 5, 1)
+    ])
+    expect(b.deletedFiles).toBe(2)
+  })
+
+  it('produces an explainable factor breakdown that omits zero terms', () => {
+    const b = computeBlastRadius([file('src/main/a.ts', 50, 5), file('src/renderer/b.tsx', 30, 2)])
+    const labels = b.factors.map((f) => f.label)
+    expect(labels).toContain('Breadth')
+    expect(labels).toContain('Cross-cutting') // 2 subsystems
+    expect(b.factors.every((f) => f.points > 0)).toBe(true)
+    // factors should roughly sum toward the score (capped terms aside)
+    expect(b.factors.reduce((s, f) => s + f.points, 0)).toBeGreaterThan(0)
+  })
+
+  it('ranks the most-churned files first (top 5)', () => {
+    const b = computeBlastRadius([
+      file('small.ts', 1, 0),
+      file('huge.ts', 300, 100),
+      file('mid.ts', 40, 10)
+    ])
+    expect(b.topFiles.map((f) => f.path)).toEqual(['huge.ts', 'mid.ts', 'small.ts'])
+    expect(b.topFiles[0].churn).toBe(400)
+  })
+
+  it('treats shared/public-surface files as a critical hit', () => {
+    const b = computeBlastRadius([file('src/shared/types.ts', 20, 5)])
+    expect(b.criticalHits.map((h) => h.reason)).toContain('public surface / shared API')
   })
 })
