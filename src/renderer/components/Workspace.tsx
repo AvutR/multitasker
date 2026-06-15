@@ -8,10 +8,11 @@ import { CodeView } from './CodeView'
 import { DiffView } from './DiffView'
 import { CIPanel } from './CIPanel'
 import { MemoryPanel } from './MemoryPanel'
+import { SubAgentsPanel } from './SubAgentsPanel'
 import { TrustBar } from './TrustBar'
 
-type Tab = 'transcript' | 'code' | 'diff' | 'ci' | 'memory'
-const TABS: { id: Tab; label: string }[] = [
+type Tab = 'transcript' | 'code' | 'diff' | 'ci' | 'memory' | 'subagents'
+const BASE_TABS: { id: Tab; label: string }[] = [
   { id: 'transcript', label: 'Transcript' },
   { id: 'code', label: 'Code' },
   { id: 'diff', label: 'Diff' },
@@ -25,7 +26,12 @@ export function Workspace() {
   const models = useStore((s) => s.models)
   const resume = useStore((s) => s.resume)
   const markDone = useStore((s) => s.markDone)
+  // A conductor's sub-agents get their own tab — only when it has delegated any.
+  const childCount = useStore((s) => (selectedId ? Object.values(s.sessions).filter((x) => x.parentId === selectedId).length : 0))
   const [tab, setTab] = useState<Tab>('transcript')
+  const TABS = childCount > 0 ? [...BASE_TABS, { id: 'subagents' as Tab, label: `Sub-agents (${childCount})` }] : BASE_TABS
+  // Fall back if the active tab no longer exists (e.g. the sub-agents tab vanished).
+  const activeTab: Tab = TABS.some((t) => t.id === tab) ? tab : 'transcript'
 
   if (!session) {
     return (
@@ -75,7 +81,7 @@ export function Workspace() {
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={`rounded px-2.5 py-1 text-xs font-medium ${
-                  tab === t.id ? 'bg-ink-600 text-white' : 'text-[#8a93a6] hover:bg-ink-700'
+                  activeTab === t.id ? 'bg-ink-600 text-white' : 'text-[#8a93a6] hover:bg-ink-700'
                 }`}
               >
                 {t.label}
@@ -85,11 +91,12 @@ export function Workspace() {
         </div>
       </div>
       <div className="min-h-0 flex-1">
-        {tab === 'transcript' && <Transcript sessionId={session.id} />}
-        {tab === 'code' && <CodeView sessionId={session.id} />}
-        {tab === 'diff' && <DiffView sessionId={session.id} />}
-        {tab === 'ci' && <CIPanel sessionId={session.id} />}
-        {tab === 'memory' && <MemoryPanel sessionId={session.id} />}
+        {activeTab === 'transcript' && <Transcript sessionId={session.id} />}
+        {activeTab === 'code' && <CodeView sessionId={session.id} />}
+        {activeTab === 'diff' && <DiffView sessionId={session.id} />}
+        {activeTab === 'ci' && <CIPanel sessionId={session.id} />}
+        {activeTab === 'memory' && <MemoryPanel sessionId={session.id} />}
+        {activeTab === 'subagents' && <SubAgentsPanel sessionId={session.id} />}
       </div>
     </section>
   )
