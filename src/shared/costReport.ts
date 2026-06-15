@@ -81,3 +81,9 @@ export function formatTokens(n: number): string {
   if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`
   return `${(n / 1_000_000).toFixed(2)}M`
 }
+
+/** Rough token estimate for a blob of text (~4 chars/token) — used to surface
+ *  where a transcript's token bloat comes from before it eats the budget. */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4)
+}

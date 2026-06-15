@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TranscriptMessage } from '@shared/types'
 import { buildTimeline, summarizeTool, type TimelineEvent, type ToolStatus } from '@shared/transcript'
+import { estimateTokens, formatTokens } from '@shared/costReport'
 import { useStore } from '../store/store'
 import { PlanApprovalCard } from './PlanApprovalCard'
+
+// A tool output above this estimate is "bulky" — worth flagging as token cost.
+const BULKY_TOKENS = 500
 
 export function Transcript({ sessionId }: { sessionId: string }) {
   const messages = useStore((s) => s.messages[sessionId] ?? EMPTY)
@@ -117,6 +121,10 @@ const DOT: Record<ToolStatus, string> = { running: '#6ea8fe', ok: '#5bd4a4', err
 function ToolRow({ ev }: { ev: Extract<TimelineEvent, { kind: 'tool' }> }) {
   const [open, setOpen] = useState(false)
   const { label, detail } = summarizeTool(ev.name, ev.input)
+  // Surface where context cost comes from: estimate the tool output's tokens and
+  // flag the bulky ones (amber past ~2k) so token bloat is visible inline.
+  const tokens = ev.result ? estimateTokens(ev.result) : 0
+  const bulky = tokens >= BULKY_TOKENS
 
   return (
     <div className="py-0.5">
@@ -130,7 +138,16 @@ function ToolRow({ ev }: { ev: Extract<TimelineEvent, { kind: 'tool' }> }) {
         />
         <span className="shrink-0 font-medium text-[#9aa4b2]">{label}</span>
         {detail && <span className="truncate font-mono text-[11px] text-[#6b7280]">{detail}</span>}
-        <span className="ml-auto shrink-0 text-[#3a4150]">{open ? '−' : '+'}</span>
+        {bulky && (
+          <span
+            className="ml-auto shrink-0 rounded px-1 text-[10px] tabular-nums"
+            style={{ background: tokens >= 2000 ? '#f5a62315' : '#222734', color: tokens >= 2000 ? '#f5a623' : '#6b7280' }}
+            title={`Tool output ≈ ${formatTokens(tokens)} tokens — large outputs add to context cost`}
+          >
+            ~{formatTokens(tokens)} tok
+          </span>
+        )}
+        <span className={`shrink-0 text-[#3a4150] ${bulky ? '' : 'ml-auto'}`}>{open ? '−' : '+'}</span>
       </button>
       {open && (
         <div className="ml-3.5 mt-1 space-y-1.5 border-l border-ink-600 pl-3">

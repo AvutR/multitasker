@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionInfo } from '@shared/types'
-import { buildCostReport, formatTokens } from '../../src/shared/costReport'
+import { buildCostReport, estimateTokens, formatTokens } from '../../src/shared/costReport'
 
 function session(over: Partial<SessionInfo>): SessionInfo {
   return {
@@ -61,5 +61,13 @@ describe('formatTokens', () => {
     expect(formatTokens(640)).toBe('640')
     expect(formatTokens(1234)).toBe('1.2k')
     expect(formatTokens(1_250_000)).toBe('1.25M')
+  })
+})
+
+describe('estimateTokens', () => {
+  it('approximates ~4 chars per token', () => {
+    expect(estimateTokens('')).toBe(0)
+    expect(estimateTokens('a'.repeat(4))).toBe(1)
+    expect(estimateTokens('a'.repeat(4000))).toBe(1000)
   })
 })
