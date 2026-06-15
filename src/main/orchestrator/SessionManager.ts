@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
 import { idleSessionIds } from '@shared/board'
 import { recommendModelForSubtask } from '@shared/modelTier'
+import { buildTaskBrief } from '@shared/taskBrief'
+import { recall } from '../integrations/agentMemory'
+import { projectRoot } from '../util/projectRoot'
+import { writeWorktreeBrief } from '../util/taskBriefFile'
 import type { Repositories } from '../db/repositories'
 import type { EventBus } from '../events'
 import type { ActionService } from '../integrations/ActionService'
@@ -134,8 +138,23 @@ export class SessionManager {
     this.repos.sessions.insert(info)
     this.bus.emit({ channel: 'session:updated', payload: info })
 
+    // Per-task context (.md) for memory optimization / context min-maxing: prime
+    // the agent with the task + the most relevant slice of PROJECT memory. In a
+    // worktree it's written as a git-invisible CLAUDE.local.md (Claude Code
+    // auto-loads it, localized to this task); otherwise it's appended to the
+    // session's system prompt. Best-effort — never blocks a spawn.
+    let systemPromptAppend = preset.systemPromptAppend
+    try {
+      const root = await projectRoot(req.cwd)
+      const brief = buildTaskBrief({ title: info.title, issueIdentifier: req.linearIssueId ?? null, notes: recall(root, undefined, 5) })
+      if (worktreePath) await writeWorktreeBrief(worktreePath, brief)
+      else systemPromptAppend = `${preset.systemPromptAppend}\n\n${brief}`
+    } catch {
+      // fall back to the plain preset prompt
+    }
+
     const session = new AgentSession(this.deps, info, {
-      systemPromptAppend: preset.systemPromptAppend,
+      systemPromptAppend,
       isBuildPipeline: Boolean(preset.isBuildPipeline)
     })
     this.sessions.set(id, session)

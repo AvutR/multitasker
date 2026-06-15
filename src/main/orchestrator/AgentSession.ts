@@ -7,6 +7,7 @@ import { createConnectorGate, type GateDecision } from '../integrations/guards'
 import { createIntegrationMcpServer, type Orchestration } from '../integrations/integrationMcpServer'
 import { resolveModel } from '../models'
 import { claudeExecutablePath } from '../sdkRuntime'
+import { projectRoot } from '../util/projectRoot'
 import { AsyncQueue } from '../util/AsyncQueue'
 import { assistantBlocks, extractDelta, isExitPlanTool, userBlocks } from './sdkMapping'
 
@@ -138,9 +139,12 @@ export class AgentSession {
   private async run(resume: { resume?: string; fork: boolean } | undefined): Promise<void> {
     const sdk = (await import('@anthropic-ai/claude-agent-sdk')) as { query: unknown }
     const query = sdk.query as LooseQuery
+    // Key memory by the PROJECT root (not the worktree), so a conductor, its
+    // sub-agents, and any session on the same repo share one project memory.
+    const memoryRoot = await projectRoot(this.info.cwd)
     const integrationServer = createIntegrationMcpServer(this.deps.actions, this.info.id, {
       orchestration: this.deps.orchestration,
-      memoryRoot: this.info.cwd // sub-agents inherit the conductor's cwd → shared memory
+      memoryRoot
     })
     this.patch({ status: 'running' })
 

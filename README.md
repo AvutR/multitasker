@@ -111,7 +111,7 @@ echo '{ "active": "gitlab-ci" }' > ~/.multitasker/ci.json
 ## Power-user & performance
 
 - **Command palette (⌘K).** Fuzzy-jump to any session by title or run a command (new session, toggle dry-run, go to Mission Control, open Tasks). ⌘N spawns a session; **esc** steps back to the board. The keyboard home base for driving many agents fast.
-- **Shared agent memory.** Agents save notes to a per-project memory with the `remember` tool and read them back with `recall`. A conductor's sub-agents inherit its working dir, so they share one memory — a sub-agent's finding is instantly recallable by the conductor, and knowledge accumulates across runs instead of being rediscovered. See it in the session's **Memory** tab.
+- **Shared agent memory + per-task context.** Agents save notes to a **project-wide** memory (`remember`) and read them back (`recall`); memory is keyed by the git project root, so a conductor, its sub-agents, and every session on the repo share one memory — findings accumulate across runs instead of being rediscovered. See the session's **Memory** tab. On spawn, each task is also primed with an auto-generated **per-task brief** (`# Task context` + the most relevant project memory) — written as a git-invisible `CLAUDE.local.md` in worktree sessions (Claude Code auto-loads it, localized to that task) or injected into the system prompt otherwise. Context min-maxed: the right signal up front, nothing extra.
 - **Read caching.** The Tasks inbox (which spawns a subprocess) and the CI/CD tab (which shells out to `gh`) are cached with a short TTL, so reopening them is instant; **Refresh** forces a live re-fetch.
 
 ## How it works
