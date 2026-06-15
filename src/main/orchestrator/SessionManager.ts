@@ -113,10 +113,29 @@ export class SessionManager {
       }
     }
 
+    const title = req.title?.trim() || deriveTitle(req.prompt)
+
+    // Per-task context (.md) for memory optimization / context min-maxing: prime
+    // the agent with the task + the most relevant slice of PROJECT memory. In a
+    // worktree it's written as a git-invisible CLAUDE.local.md (Claude Code
+    // auto-loads it, localized to this task); otherwise it's appended to the
+    // session's system prompt. The brief is persisted on the session so the UI
+    // can show exactly what context primed it. Best-effort — never blocks a spawn.
+    let systemPromptAppend = preset.systemPromptAppend
+    let taskBrief: string | null = null
+    try {
+      const root = await projectRoot(req.cwd)
+      taskBrief = buildTaskBrief({ title, issueIdentifier: req.linearIssueId ?? null, notes: recall(root, undefined, 5) })
+      if (worktreePath) await writeWorktreeBrief(worktreePath, taskBrief)
+      else systemPromptAppend = `${preset.systemPromptAppend}\n\n${taskBrief}`
+    } catch {
+      // fall back to the plain preset prompt
+    }
+
     const info: SessionInfo = {
       id,
       sdkSessionId: null,
-      title: req.title?.trim() || deriveTitle(req.prompt),
+      title,
       model: req.model ?? settings.defaultModel,
       cwd,
       repoId: repo?.id ?? null,
@@ -133,25 +152,11 @@ export class SessionManager {
       workState: 'active',
       linearIssueId: req.linearIssueId ?? null,
       notionPageId: req.notionPageId ?? null,
-      parentId: req.parentId ?? null
+      parentId: req.parentId ?? null,
+      taskBrief
     }
     this.repos.sessions.insert(info)
     this.bus.emit({ channel: 'session:updated', payload: info })
-
-    // Per-task context (.md) for memory optimization / context min-maxing: prime
-    // the agent with the task + the most relevant slice of PROJECT memory. In a
-    // worktree it's written as a git-invisible CLAUDE.local.md (Claude Code
-    // auto-loads it, localized to this task); otherwise it's appended to the
-    // session's system prompt. Best-effort — never blocks a spawn.
-    let systemPromptAppend = preset.systemPromptAppend
-    try {
-      const root = await projectRoot(req.cwd)
-      const brief = buildTaskBrief({ title: info.title, issueIdentifier: req.linearIssueId ?? null, notes: recall(root, undefined, 5) })
-      if (worktreePath) await writeWorktreeBrief(worktreePath, brief)
-      else systemPromptAppend = `${preset.systemPromptAppend}\n\n${brief}`
-    } catch {
-      // fall back to the plain preset prompt
-    }
 
     const session = new AgentSession(this.deps, info, {
       systemPromptAppend,

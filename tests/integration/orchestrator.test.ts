@@ -454,6 +454,21 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     const info = makeInfo(repos, { parentId: 'conductor-123' })
     expect(repos.sessions.get(info.id)?.parentId).toBe('conductor-123')
   })
+
+  it('persists the per-task brief and reflects it on spawned sessions', async () => {
+    const { repos, bus, actions } = deps()
+    // Direct repo round-trip.
+    const info = makeInfo(repos, { taskBrief: '# Task context\n\n**Task:** ship it' })
+    expect(repos.sessions.get(info.id)?.taskBrief).toContain('ship it')
+
+    // And a real spawn stores a generated brief containing the title.
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const s = await manager.spawn({ prompt: 'Add CSV export', cwd: '/tmp/proj', presetId: 'explore', title: 'CSV export', useWorktree: false })
+    const stored = manager.list().find((x) => x.id === s.id)
+    expect(stored?.taskBrief).toContain('# Task context')
+    expect(stored?.taskBrief).toContain('CSV export')
+  })
 })
 
 describe('integration MCP server wiring', () => {

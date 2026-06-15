@@ -56,6 +56,8 @@ export interface SessionInfo {
   notionPageId?: string | null
   /** Set when this session was delegated by a conductor — its orchestrator. */
   parentId?: string | null
+  /** The per-task context brief generated at spawn (what primed the agent). */
+  taskBrief?: string | null
 }
 
 // ---------------------------------------------------------------------------

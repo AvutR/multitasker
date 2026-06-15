@@ -42,6 +42,7 @@ interface SessionRow {
   parent_id: string | null
   input_tokens: number
   output_tokens: number
+  task_brief: string | null
 }
 
 interface MessageRow {
@@ -96,7 +97,8 @@ function toSession(r: SessionRow): SessionInfo {
     notionPageId: r.notion_page_id,
     parentId: r.parent_id,
     inputTokens: r.input_tokens,
-    outputTokens: r.output_tokens
+    outputTokens: r.output_tokens,
+    taskBrief: r.task_brief
   }
 }
 
@@ -112,7 +114,8 @@ function bindSession(s: SessionInfo): Record<string, unknown> {
     notionPageId: s.notionPageId ?? null,
     parentId: s.parentId ?? null,
     inputTokens: s.inputTokens ?? 0,
-    outputTokens: s.outputTokens ?? 0
+    outputTokens: s.outputTokens ?? 0,
+    taskBrief: s.taskBrief ?? null
   }
 }
 
@@ -156,10 +159,10 @@ export class SessionRepo {
       .prepare(
         `INSERT INTO sessions (id, sdk_session_id, title, model, cwd, repo_id, branch, worktree_path,
            status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error,
-           pinned, work_state, linear_issue_id, notion_page_id, parent_id, input_tokens, output_tokens)
+           pinned, work_state, linear_issue_id, notion_page_id, parent_id, input_tokens, output_tokens, task_brief)
          VALUES (@id, @sdkSessionId, @title, @model, @cwd, @repoId, @branch, @worktreePath,
            @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error,
-           @pinned, @workState, @linearIssueId, @notionPageId, @parentId, @inputTokens, @outputTokens)`
+           @pinned, @workState, @linearIssueId, @notionPageId, @parentId, @inputTokens, @outputTokens, @taskBrief)`
       )
       .run(bindSession(s))
   }
