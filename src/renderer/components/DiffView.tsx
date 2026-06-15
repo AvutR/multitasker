@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { DiffFile } from '@shared/types'
+import { computeBlastRadius, landRisk } from '@shared/blastRadius'
 import { useStore } from '../store/store'
 import { MonacoDiff } from './MonacoDiff'
 import { BlastRadiusBar } from './BlastRadius'
@@ -12,6 +13,9 @@ export function DiffView({ sessionId }: { sessionId: string }) {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
+  const [confirming, setConfirming] = useState(false)
+
+  const risk = landRisk(computeBlastRadius(files))
 
   const reload = async () => {
     const d = await window.api.invoke('git:diff', { sessionId })
@@ -36,8 +40,14 @@ export function DiffView({ sessionId }: { sessionId: string }) {
 
   const current = files.find((f) => f.relPath === selected) ?? null
 
-  const commit = async () => {
+  const commit = async (force = false) => {
     if (!message.trim()) return
+    // Soft pre-commit gate: a high-risk change asks for confirmation once.
+    if (risk.risky && !force) {
+      setConfirming(true)
+      return
+    }
+    setConfirming(false)
     setBusy(true)
     try {
       const r = await window.api.invoke('git:commit', { sessionId, message: message.trim() })
@@ -106,19 +116,41 @@ export function DiffView({ sessionId }: { sessionId: string }) {
           )}
         </div>
       </div>
+      {confirming && (
+        <div className="flex items-center gap-3 border-t border-[#f5a623]/40 bg-[#f5a623]/10 px-3 py-2 text-xs">
+          <span className="text-[#f5a623]">⚠</span>
+          <span className="flex-1 text-[#d7dbe3]">
+            This change is {risk.reasons.join(' · ')}. Land anyway?
+          </span>
+          <button
+            onClick={() => void commit(true)}
+            className="rounded bg-[#f5a623] px-2.5 py-1 text-xs font-semibold text-ink-900 hover:bg-[#ffb733]"
+          >
+            Land anyway
+          </button>
+          <button onClick={() => setConfirming(false)} className="rounded px-2.5 py-1 text-xs text-[#b9c0cc] hover:bg-ink-700">
+            Cancel
+          </button>
+        </div>
+      )}
       <div className="flex items-center gap-2 border-t border-ink-600 px-3 py-2">
         <input
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value)
+            setConfirming(false)
+          }}
           placeholder={`Commit locally${branch ? ` to ⎇ ${branch}` : ''} — no push`}
           className="flex-1 rounded border border-ink-500 bg-ink-700 px-2 py-1.5 text-sm"
         />
         <button
           onClick={() => void commit()}
           disabled={busy || !message.trim() || files.length === 0}
-          className="rounded bg-accent px-3 py-1.5 text-sm font-semibold text-ink-900 disabled:opacity-40 hover:bg-[#8bbcff]"
+          className={`rounded px-3 py-1.5 text-sm font-semibold disabled:opacity-40 ${
+            risk.risky ? 'bg-[#f5a623] text-ink-900 hover:bg-[#ffb733]' : 'bg-accent text-ink-900 hover:bg-[#8bbcff]'
+          }`}
         >
-          {busy ? 'Committing…' : 'Land (commit)'}
+          {busy ? 'Committing…' : risk.risky ? 'Review & land' : 'Land (commit)'}
         </button>
         <button
           onClick={() => void undo()}

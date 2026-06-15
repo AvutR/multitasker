@@ -174,6 +174,23 @@ function buildSummary(files: number, subsystems: number, hits: CriticalHit[]): s
   return parts.join(' · ')
 }
 
+/**
+ * Should landing this change ask for confirmation? A soft pre-commit gate: a
+ * high/critical-blast-radius change, or one that touches source without any
+ * tests, is worth a second look before it's committed. Returns the reasons so
+ * the UI can explain the warning. (Warns — never blocks.)
+ */
+export function landRisk(blast: BlastRadius): { risky: boolean; reasons: string[] } {
+  const reasons: string[] = []
+  if (blast.level === 'critical') reasons.push('critical blast radius')
+  else if (blast.level === 'high') reasons.push('high blast radius')
+  if (blast.testGap) reasons.push('source changed but no tests')
+  const critical = [...new Set(blast.criticalHits.map((h) => h.reason))]
+  if (critical.length) reasons.push(`touches ${critical.slice(0, 2).join(', ')}`)
+  const risky = blast.level === 'high' || blast.level === 'critical' || blast.testGap
+  return { risky, reasons }
+}
+
 export const BLAST_META: Record<BlastLevel, { label: string; color: string }> = {
   minimal: { label: 'Minimal', color: '#7e8796' },
   low: { label: 'Low', color: '#5bd4a4' },

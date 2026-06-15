@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DiffFile, DiffStatus } from '@shared/types'
-import { computeBlastRadius } from '../../src/shared/blastRadius'
+import { computeBlastRadius, landRisk } from '../../src/shared/blastRadius'
 
 function file(relPath: string, additions = 5, deletions = 2, status: DiffStatus = 'modified'): DiffFile {
   return { relPath, status, additions, deletions, oldContent: '', newContent: '' }
@@ -110,5 +110,33 @@ describe('computeBlastRadius — in-depth signals', () => {
   it('treats shared/public-surface files as a critical hit', () => {
     const b = computeBlastRadius([file('src/shared/types.ts', 20, 5)])
     expect(b.criticalHits.map((h) => h.reason)).toContain('public surface / shared API')
+  })
+})
+
+describe('landRisk — soft pre-commit gate', () => {
+  it('is not risky for a small change with tests', () => {
+    const r = landRisk(computeBlastRadius([file('src/a.ts', 5, 1), file('a.test.ts', 10, 0)]))
+    expect(r.risky).toBe(false)
+    expect(r.reasons).toEqual([])
+  })
+
+  it('is risky when source changes without tests, and says so', () => {
+    const r = landRisk(computeBlastRadius([file('src/a.ts', 30, 2)]))
+    expect(r.risky).toBe(true)
+    expect(r.reasons).toContain('source changed but no tests')
+  })
+
+  it('is risky for a high/critical blast radius and explains why', () => {
+    const r = landRisk(
+      computeBlastRadius([
+        file('src/main/db/migrations.ts', 80, 10),
+        file('package-lock.json', 300, 120),
+        file('.github/workflows/deploy.yml', 40, 5),
+        file('src/main/auth/login.ts', 60, 30)
+      ])
+    )
+    expect(r.risky).toBe(true)
+    expect(r.reasons[0]).toMatch(/blast radius/)
+    expect(r.reasons.some((x) => x.startsWith('touches'))).toBe(true)
   })
 })
