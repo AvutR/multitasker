@@ -49,8 +49,10 @@ export function App() {
         if (view === 'session') openBoard()
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // Capture phase so Escape reaches us even when a focused native control
+    // (e.g. a <select> in the Settings modal) would otherwise swallow it.
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [showPalette, showNew, showLinear, showCost, showSettings, view, openBoard])
 
   const inSession = view === 'session' && selectedId && hasSession
