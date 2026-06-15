@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
 import { idleSessionIds } from '@shared/board'
-import { recommendModelForSubtask } from '@shared/modelTier'
+import { recommendModelForSubtask, tierForKind, TASK_KINDS } from '@shared/modelTier'
 import { buildTaskBrief } from '@shared/taskBrief'
 import { recall } from '../integrations/agentMemory'
 import { projectRoot } from '../util/projectRoot'
@@ -213,7 +213,7 @@ export class SessionManager {
    *  parentId. Goes through the same cap/queue as any session. */
   private async delegate(
     parentId: string,
-    input: { title?: string; prompt: string; model?: string }
+    input: { title?: string; prompt: string; model?: string; kind?: string }
   ): Promise<{ id: string; title: string; status: string }> {
     // Fail-safe: bound how many sub-agents one conductor can spawn so a runaway
     // delegation loop can't fill the queue with unbounded sessions.
@@ -223,11 +223,13 @@ export class SessionManager {
     }
     const parent = this.repos.sessions.get(parentId)
     const settings = this.repos.settings.get()
-    // Pick the cheapest capable tier for this sub-task: an explicit model wins,
-    // else auto-tier from the prompt (Haiku research / Sonnet code / Opus
-    // orchestrate), else the configured delegate default. This is the "cheaper
-    // models for sub-tasks" optimization, applied per delegation automatically.
-    const model = input.model ?? recommendModelForSubtask(input.prompt) ?? settings.delegateModel ?? 'sonnet'
+    // Pick the cheapest capable tier for this sub-task, in order of confidence:
+    //   explicit model > the conductor's judged `kind` > keyword auto-detect from
+    //   the prompt > the configured delegate default. The `kind` path is the
+    //   LLM-as-judge: the conductor (which has full context) names the work type
+    //   and we map it — no extra classification call. ("cheaper models for sub-tasks")
+    const judged = input.kind && (TASK_KINDS as string[]).includes(input.kind) ? tierForKind(input.kind as (typeof TASK_KINDS)[number]) : null
+    const model = input.model ?? judged ?? recommendModelForSubtask(input.prompt) ?? settings.delegateModel ?? 'sonnet'
     const child = await this.spawn({
       prompt: input.prompt,
       cwd: parent?.cwd ?? process.cwd(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifySubtask, recommendModelForSubtask } from '../../src/shared/modelTier'
+import { classifySubtask, recommendModelForSubtask, tierForKind, TASK_KINDS } from '../../src/shared/modelTier'
 
 describe('modelTier — auto-select a model for a delegated sub-task', () => {
   it('routes research/exploration to the cheap tier (haiku)', () => {
@@ -34,5 +34,19 @@ describe('modelTier — auto-select a model for a delegated sub-task', () => {
   it('prefers the more specific intent (review over implement)', () => {
     // "review the changes you implement" — review wins (listed first, more specific).
     expect(classifySubtask('review the implementation')).toBe('review')
+  })
+
+  it('tierForKind maps a conductor-judged kind to the right tier (LLM-as-judge)', () => {
+    expect(tierForKind('research')).toBe('haiku')
+    expect(tierForKind('docs')).toBe('haiku')
+    expect(tierForKind('implement')).toBe('sonnet')
+    expect(tierForKind('test')).toBe('sonnet')
+    expect(tierForKind('review')).toBe('sonnet')
+    expect(tierForKind('orchestrate')).toBe('opus')
+  })
+
+  it('TASK_KINDS covers every kind tierForKind handles', () => {
+    expect(TASK_KINDS).toHaveLength(6)
+    for (const k of TASK_KINDS) expect(['haiku', 'sonnet', 'opus']).toContain(tierForKind(k))
   })
 })

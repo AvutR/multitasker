@@ -37,6 +37,14 @@ const TIER_BY_KIND: Record<TaskKind, ModelTier> = {
   docs: 'haiku'
 }
 
+/** All task kinds, for validating a caller-supplied (LLM-judged) kind. */
+export const TASK_KINDS: TaskKind[] = ['orchestrate', 'review', 'test', 'research', 'docs', 'implement']
+
+/** The tier for a known task kind — the conductor names the kind, we map it. */
+export function tierForKind(kind: TaskKind): ModelTier {
+  return TIER_BY_KIND[kind]
+}
+
 /** Best-effort task kind for a sub-task prompt, or null if nothing matches. */
 export function classifySubtask(text: string): TaskKind | null {
   for (const r of RULES) if (r.test.test(text)) return r.kind

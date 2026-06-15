@@ -13,7 +13,7 @@ export interface IntegrationServerOptions {
 /** Lets a conductor session fan work out to cheaper, parallel sub-agents.
  *  Injected by SessionManager so the MCP layer has no orchestrator dependency. */
 export interface Orchestration {
-  delegate: (parentId: string, input: { title?: string; prompt: string; model?: string }) => Promise<{ id: string; title: string; status: string }>
+  delegate: (parentId: string, input: { title?: string; prompt: string; model?: string; kind?: string }) => Promise<{ id: string; title: string; status: string }>
   listChildren: (parentId: string) => { id: string; title: string; status: string; summary: string }[]
 }
 
@@ -59,11 +59,12 @@ export function createIntegrationMcpServer(actionService: ActionService, session
     ? [
         tool(
           'delegate_subtask',
-          'Delegate ONE focused, independent piece of work to a parallel sub-agent in this same repo. The model is AUTO-SELECTED from your prompt (research/search → Haiku, implement/test/review → Sonnet), so phrase it for what it does. Use this to fan out decomposed work — call it once per independent sub-task. Returns the sub-agent id.',
+          'Delegate ONE focused, independent piece of work to a parallel sub-agent in this same repo. Set `kind` to the type of work and the right cheap model is chosen for you (research/docs → Haiku, implement/test/review → Sonnet, orchestrate → Opus). Use this to fan out decomposed work — call it once per independent sub-task. Returns the sub-agent id.',
           {
             title: z.string().describe('Short title for the sub-task'),
             prompt: z.string().describe('The full, self-contained instruction for the sub-agent'),
-            model: z.string().optional().describe('Model id to override the auto-selected tier (e.g. force opus for a hard sub-task)')
+            kind: z.enum(['research', 'docs', 'implement', 'test', 'review', 'orchestrate']).optional().describe('The kind of work — picks the cheapest capable model tier. Omit to auto-detect from the prompt.'),
+            model: z.string().optional().describe('Model id to hard-override the tier (rarely needed)')
           },
           async (args) => {
             const r = await orchestration.delegate(sessionId, args)
