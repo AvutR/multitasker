@@ -40,14 +40,18 @@ export function App() {
         e.preventDefault()
         setShowNew(true)
       } else if (e.key === 'Escape') {
-        // Let an open overlay handle its own Escape; otherwise step back to the board.
-        if (showPalette || showNew || showLinear) return
+        // Escape closes the topmost overlay; only steps back to the board when none is open.
+        if (showPalette) return // the palette input handles its own Escape
+        if (showCost) return setShowCost(false)
+        if (showSettings) return setShowSettings(false)
+        if (showNew) return setShowNew(false)
+        if (showLinear) return setShowLinear(false)
         if (view === 'session') openBoard()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [showPalette, showNew, showLinear, view, openBoard])
+  }, [showPalette, showNew, showLinear, showCost, showSettings, view, openBoard])
 
   const inSession = view === 'session' && selectedId && hasSession
 

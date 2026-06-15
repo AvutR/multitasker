@@ -191,7 +191,10 @@ export const useStore = create<State>((set, get) => ({
   },
   patchSettings: async (patch) => {
     const settings = await window.api.invoke('settings:set', patch)
-    set({ settings })
+    // The gateway model is derived from settings, so refresh the model list too —
+    // otherwise a gateway just configured here wouldn't appear in the picker.
+    const models = await window.api.invoke('models:list')
+    set({ settings, models })
   },
   reclaimIdle: async () => window.api.invoke('session:reclaimIdle'),
   undoLastCommit: async (sessionId) => window.api.invoke('git:undoLastCommit', { sessionId }),
