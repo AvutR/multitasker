@@ -232,13 +232,15 @@ export class SessionManager {
     }
     const parent = this.repos.sessions.get(parentId)
     const settings = this.repos.settings.get()
-    // Pick the cheapest capable tier for this sub-task, in order of confidence:
-    //   explicit model > the conductor's judged `kind` > keyword auto-detect from
-    //   the prompt > the configured delegate default. The `kind` path is the
-    //   LLM-as-judge: the conductor (which has full context) names the work type
-    //   and we map it — no extra classification call. ("cheaper models for sub-tasks")
+    // Pick the model for this sub-task. Order of confidence:
+    //   explicit model > (auto strategy only:) judged kind > keyword auto-detect
+    //   > the configured delegate default.
+    // 'auto' (default) tiers by task kind — the conductor judges `kind`, we map it,
+    // else infer from the prompt. 'fixed' skips tiering and always uses delegateModel,
+    // giving the user full control over sub-agent model assignment.
     const judged = input.kind && (TASK_KINDS as string[]).includes(input.kind) ? tierForKind(input.kind as (typeof TASK_KINDS)[number]) : null
-    const model = input.model ?? judged ?? recommendModelForSubtask(input.prompt) ?? settings.delegateModel ?? 'sonnet'
+    const autoTier = (settings.tieringStrategy ?? 'auto') === 'auto' ? (judged ?? recommendModelForSubtask(input.prompt)) : null
+    const model = input.model ?? autoTier ?? settings.delegateModel ?? 'sonnet'
     const child = await this.spawn({
       prompt: input.prompt,
       cwd: parent?.cwd ?? process.cwd(),

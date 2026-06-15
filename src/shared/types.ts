@@ -263,6 +263,9 @@ export interface AppSettings {
   defaultModel: string // a ModelOption id (see main/models.ts)
   /** Model id used for delegated sub-agents — cheaper than the conductor's. */
   delegateModel?: string
+  /** How sub-agent models are chosen: 'auto' tiers by task kind (cheap research,
+   *  mid code, strong orchestrate — the default); 'fixed' always uses delegateModel. */
+  tieringStrategy?: 'auto' | 'fixed'
   /** Soft spend cap (USD) for the budget guardrail. 0/undefined = no budget. */
   budgetUsd?: number
   // Optional Anthropic-compatible gateway for non-Anthropic providers

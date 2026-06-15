@@ -405,6 +405,20 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     expect(list.find((s) => s.id === explicit.id)?.model).toBe('opus') // explicit override wins
   })
 
+  it("'fixed' tiering strategy skips auto-tiering and uses the delegate model", async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8, delegateModel: 'opus', tieringStrategy: 'fixed' })
+    h.queryImpl = noop
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'orchestrate', cwd: '/tmp/proj', presetId: 'conduct', useWorktree: false })
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    // Prompt says "research" (would auto-tier to haiku) and kind=research too —
+    // but 'fixed' ignores both and uses the delegate model.
+    const child = (await orch.delegate(conductor.id, { title: 'r', prompt: 'research the cache', kind: 'research' })) as { id: string }
+    expect(manager.list().find((s) => s.id === child.id)?.model).toBe('opus')
+  })
+
   it('honors the conductor-judged kind over the prompt wording (LLM-as-judge)', async () => {
     const { repos, bus, actions } = deps()
     repos.settings.set({ concurrencyCap: 8, delegateModel: 'sonnet' })

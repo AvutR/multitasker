@@ -10,6 +10,7 @@ import { NewSessionModal } from './components/NewSessionModal'
 import { LinearPanel } from './components/LinearPanel'
 import { CommandPalette } from './components/CommandPalette'
 import { CostObservatory } from './components/CostObservatory'
+import { SettingsModal } from './components/SettingsModal'
 
 export function App() {
   const init = useStore((s) => s.init)
@@ -22,6 +23,7 @@ export function App() {
   const [showLinear, setShowLinear] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const [showCost, setShowCost] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     void init()
@@ -51,7 +53,7 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col bg-ink-900 text-[#d7dbe3]">
-      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} onCost={() => setShowCost(true)} />
+      <Header onNew={() => setShowNew(true)} onLinear={() => setShowLinear(true)} onPalette={() => setShowPalette(true)} onCost={() => setShowCost(true)} onSettings={() => setShowSettings(true)} />
       <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: 'minmax(0, 1fr) 380px' }}>
         {inSession ? (
           <section className="flex min-h-0 flex-col bg-ink-900">
@@ -79,9 +81,11 @@ export function App() {
           onNew={() => setShowNew(true)}
           onTasks={() => setShowLinear(true)}
           onCost={() => setShowCost(true)}
+          onSettings={() => setShowSettings(true)}
         />
       )}
       {showCost && <CostObservatory onClose={() => setShowCost(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {!ready && (
         <div className="pointer-events-none fixed inset-0 grid place-items-center">
           <span className="rounded bg-ink-700 px-3 py-1.5 text-sm text-[#8a93a6]">Connecting to orchestrator…</span>
@@ -91,7 +95,7 @@ export function App() {
   )
 }
 
-function Header({ onNew, onLinear, onPalette, onCost }: { onNew: () => void; onLinear: () => void; onPalette: () => void; onCost: () => void }) {
+function Header({ onNew, onLinear, onPalette, onCost, onSettings }: { onNew: () => void; onLinear: () => void; onPalette: () => void; onCost: () => void; onSettings: () => void }) {
   const sessions = useStore((s) => s.sessions)
   const planRequests = useStore((s) => s.planRequests)
   const actions = useStore((s) => s.actions)
@@ -160,6 +164,14 @@ function Header({ onNew, onLinear, onPalette, onCost }: { onNew: () => void; onL
         </button>
         <button onClick={onLinear} className="rounded bg-ink-600 px-2.5 py-1 font-medium text-[#b9c0cc] hover:bg-ink-500">
           Tasks
+        </button>
+        <button onClick={onSettings} title="Settings" aria-label="Settings" className="rounded p-1.5 text-[#8a93a6] hover:bg-ink-600 hover:text-[#d7dbe3]">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+            <line x1="2" y1="5" x2="14" y2="5" />
+            <line x1="2" y1="11" x2="14" y2="11" />
+            <circle cx="6" cy="5" r="2" fill="#181c26" />
+            <circle cx="10" cy="11" r="2" fill="#181c26" />
+          </svg>
         </button>
         <button onClick={onNew} className="rounded bg-accent px-2.5 py-1 font-semibold text-ink-900 hover:bg-[#8bbcff]">
           + New
