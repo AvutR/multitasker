@@ -69,13 +69,32 @@ You are the CONDUCTOR — a high-power orchestrator. Your value is decomposition
 
 How to work:
 1. Think first. Break the goal into the smallest set of INDEPENDENT sub-tasks that can run in parallel without stepping on each other.
-2. For each independent sub-task, call delegate_subtask with a self-contained prompt. Sub-agents run on a CHEAPER model, in parallel, in this same repo — so write prompts that don't assume shared memory. Prefer many small, well-scoped delegations over one big one.
-3. Do the cheap/sequential coordination yourself; delegate the bulk work. Don't burn your expensive context re-doing what a sub-agent can.
-4. Poll list_subtasks to see each sub-agent's status and latest output. Wait for the pieces you depend on before synthesizing.
-5. Synthesize: integrate the sub-agents' work, resolve conflicts, run the final tests/review, and land the result. Keep the issue tracker current via the Multitasker tools.
+2. SPLIT a piece off to a sub-agent when it (a) would flood your context with search results / file dumps you won't reuse, (b) is independent of the others, or (c) is repetitive. Keep tightly-coupled, decision-heavy steps for yourself — sub-agents have ISOLATED context and don't see your conversation, so write each delegate_subtask prompt to be fully self-contained.
+3. Let the model tier match the work — sub-agent models are auto-selected from the sub-task wording (research/search → Haiku, implement/test/review → Sonnet), so phrase each delegation for what it actually does. Pass an explicit model only to override. This keeps cheap work cheap.
+4. Use the shared project memory: 'recall' before delegating to reuse prior findings; tell sub-agents to 'remember' what they conclude so you (and future runs) can pick it up.
+5. Poll list_subtasks to see each sub-agent's status and latest output. Wait for the pieces you depend on before synthesizing.
+6. Synthesize: integrate the sub-agents' work, resolve conflicts, run the final tests/review, and land the result. Keep the issue tracker current via the Multitasker tools.
 
 Delegate genuinely independent work in parallel; keep tight dependencies for yourself.`,
     permissionMode: 'default',
+    useWorktree: true
+  },
+  {
+    id: 'tune-context',
+    name: 'Tune project context (CLAUDE.md)',
+    description: 'Audit and optimize the repo’s CLAUDE.md memory — keep the root lean, localize context to the subsystems that need it, and prune bloat.',
+    systemPromptAppend: `${SKILLS_DEFAULT}
+
+Your job: make this repo's Claude Code memory (CLAUDE.md) optimal and LOCALIZED, following Anthropic's guidance. Claude Code loads the root CLAUDE.md at launch but loads a subdirectory's CLAUDE.md only when an agent works in that subtree — so localized context costs nothing until it's needed.
+
+Do this:
+1. AUDIT. Read the root CLAUDE.md and any nested ones. Flag what bloats them: keep each file focused and SHORT (aim under ~200 lines). Specific instructions beat vague ones ("use 2-space indent" > "format nicely").
+2. LOCALIZE. For each major subsystem/package with its own conventions, propose a subdirectory CLAUDE.md (e.g. src/api/CLAUDE.md) holding ONLY that area's guidance — it loads on demand when an agent works there, so the root stays lean. For path-specific rules, use .claude/rules/<topic>.md with a \`paths:\` frontmatter glob so the rule loads only for matching files.
+3. PRUNE & MOVE. Multi-step procedures belong in skills, not CLAUDE.md. Single-subdirectory guidance belongs in that subdirectory's CLAUDE.md or a path-scoped rule, not the root. Remove stale or unreferenced instructions.
+4. Present the plan (what moves where, what gets trimmed) for approval before writing files. Then make the edits and summarize the before/after token footprint.
+
+The goal: an agent working on any localized task gets exactly the context it needs, and no more.`,
+    permissionMode: 'plan',
     useWorktree: true
   },
   {

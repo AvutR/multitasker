@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
 import { idleSessionIds } from '@shared/board'
+import { recommendModelForSubtask } from '@shared/modelTier'
 import type { Repositories } from '../db/repositories'
 import type { EventBus } from '../events'
 import type { ActionService } from '../integrations/ActionService'
@@ -203,11 +204,16 @@ export class SessionManager {
     }
     const parent = this.repos.sessions.get(parentId)
     const settings = this.repos.settings.get()
+    // Pick the cheapest capable tier for this sub-task: an explicit model wins,
+    // else auto-tier from the prompt (Haiku research / Sonnet code / Opus
+    // orchestrate), else the configured delegate default. This is the "cheaper
+    // models for sub-tasks" optimization, applied per delegation automatically.
+    const model = input.model ?? recommendModelForSubtask(input.prompt) ?? settings.delegateModel ?? 'sonnet'
     const child = await this.spawn({
       prompt: input.prompt,
       cwd: parent?.cwd ?? process.cwd(),
       presetId: 'explore', // sub-agents are plain workers
-      model: input.model ?? settings.delegateModel ?? 'sonnet',
+      model,
       title: input.title,
       parentId,
       useWorktree: false // share the conductor's worktree so sub-agents collaborate

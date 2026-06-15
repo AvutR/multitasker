@@ -65,7 +65,7 @@ Multitasker spawns every session with `settingSources: ['user','project','local'
 
 ## Importing workflows
 
-Workflows are the launch presets in the **+ New** picker (system-prompt append + permission mode + worktree on/off). Multitasker ships four neutral built-ins — **Build pipeline**, **Explore / freeform**, **Async standup**, **Issue tracker sync** — and you can add your own without touching the code.
+Workflows are the launch presets in the **+ New** picker (system-prompt append + permission mode + worktree on/off). Multitasker ships neutral built-ins — **Build pipeline**, **Explore / freeform**, **Conductor (orchestrator)**, **Tune project context (CLAUDE.md)**, **Async standup**, **Issue tracker sync** — and you can add your own without touching the code.
 
 On first run Multitasker drops a documented template at `~/.multitasker/workflows.example.json`. Copy it to `~/.multitasker/workflows.json` and edit:
 
@@ -140,7 +140,8 @@ Two enforcement paths guarantee **nothing outward escapes the policy**: agents a
 |---|---|
 | **Build pipeline** | plan → code → simplify → test → security review → land a local commit. Plan mode (hits the approval gate), runs in an isolated worktree. |
 | **Explore / freeform** | a general steerable agent with your skills + integration tools wired in. |
-| **Conductor (orchestrator)** | a high-power model decomposes the goal, fans independent sub-tasks out to **cheaper parallel sub-agents** (`delegate_subtask`), monitors them (`list_subtasks`), then synthesizes. Run it on a strong model; sub-agents default to a cheaper tier. |
+| **Conductor (orchestrator)** | a high-power model decomposes the goal, fans independent sub-tasks out to **cheaper parallel sub-agents** (`delegate_subtask`), monitors them (`list_subtasks`), then synthesizes. Each sub-agent's model is **auto-tiered from its sub-task** (research → Haiku, code/test/review → Sonnet, orchestrate → Opus), per [Anthropic's subagent model guidance](https://code.claude.com/docs/en/subagents.md). |
+| **Tune project context (CLAUDE.md)** | audits and **localizes** the repo's CLAUDE.md memory: keeps the root lean (<200 lines), moves subsystem-specific guidance into subdirectory `CLAUDE.md` (loaded only when an agent works there) and path-scoped `.claude/rules/*.md`, and prunes bloat. Encodes [Anthropic's CLAUDE.md best practices](https://code.claude.com/docs/en/claude-md.md). |
 | **Async standup** | summarize progress and post the standup (blockers/done/pending/testable) to Slack via the policy. |
 | **Issue tracker sync** | reconcile your tracker — statuses, progress comments, weekly project update. |
 

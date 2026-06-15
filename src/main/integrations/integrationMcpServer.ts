@@ -59,11 +59,11 @@ export function createIntegrationMcpServer(actionService: ActionService, session
     ? [
         tool(
           'delegate_subtask',
-          'Delegate ONE focused, independent piece of work to a cheaper parallel sub-agent. The sub-agent runs on a cheaper model in this same repo, concurrently. Use this to fan out work you have decomposed — call it once per independent sub-task. Returns the sub-agent id.',
+          'Delegate ONE focused, independent piece of work to a parallel sub-agent in this same repo. The model is AUTO-SELECTED from your prompt (research/search → Haiku, implement/test/review → Sonnet), so phrase it for what it does. Use this to fan out decomposed work — call it once per independent sub-task. Returns the sub-agent id.',
           {
             title: z.string().describe('Short title for the sub-task'),
             prompt: z.string().describe('The full, self-contained instruction for the sub-agent'),
-            model: z.string().optional().describe('Model id override (defaults to the cheaper delegate tier)')
+            model: z.string().optional().describe('Model id to override the auto-selected tier (e.g. force opus for a hard sub-task)')
           },
           async (args) => {
             const r = await orchestration.delegate(sessionId, args)

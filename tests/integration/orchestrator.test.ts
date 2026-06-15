@@ -387,6 +387,24 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     expect(kids.map((k) => k.id)).toContain(child.id)
   })
 
+  it('auto-tiers the sub-agent model from the sub-task prompt (research → haiku, implement → sonnet)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8, delegateModel: 'sonnet' })
+    h.queryImpl = noop
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'orchestrate', cwd: '/tmp/proj', presetId: 'conduct', useWorktree: false })
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    const research = (await orch.delegate(conductor.id, { title: 'r', prompt: 'find where the cache lives' })) as { id: string }
+    const impl = (await orch.delegate(conductor.id, { title: 'i', prompt: 'implement the export endpoint' })) as { id: string }
+    const explicit = (await orch.delegate(conductor.id, { title: 'x', prompt: 'find things', model: 'opus' })) as { id: string }
+
+    const list = manager.list()
+    expect(list.find((s) => s.id === research.id)?.model).toBe('haiku') // auto-tiered down
+    expect(list.find((s) => s.id === impl.id)?.model).toBe('sonnet') // auto-tiered to mid
+    expect(list.find((s) => s.id === explicit.id)?.model).toBe('opus') // explicit override wins
+  })
+
   it('listChildren surfaces a child’s latest assistant output for synthesis', () => {
     const { repos, bus, actions } = deps()
     const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
