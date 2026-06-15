@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
-import { idleSessionIds } from '@shared/board'
+import { idleSessionIds, isTerminalStatus } from '@shared/board'
 import { recommendModelForSubtask, tierForKind, TASK_KINDS } from '@shared/modelTier'
 import { buildTaskBrief } from '@shared/taskBrief'
 import { recall } from '../integrations/agentMemory'
@@ -25,9 +25,6 @@ const LIVE_STATUSES = ['queued', 'running', 'awaiting_input', 'awaiting_plan_app
 
 /** Hard ceiling on sub-agents a single conductor may spawn (runaway-loop guard). */
 const MAX_DELEGATIONS = 25
-
-/** A sub-agent in one of these states is "finished" for await purposes. */
-const TERMINAL_STATUSES = ['completed', 'landed', 'stopped', 'error']
 
 /**
  * Owns the live AgentSession pool. Enforces a concurrency cap: a live session
@@ -273,7 +270,7 @@ export class SessionManager {
     const allDone = () =>
       targets.every((id) => {
         const s = this.repos.sessions.get(id)
-        return !s || TERMINAL_STATUSES.includes(s.status)
+        return !s || isTerminalStatus(s.status)
       })
 
     if (targets.length === 0 || allDone()) return Promise.resolve(result())

@@ -1,8 +1,14 @@
 import type { ActionRecord, BoardGroup, NeedsYouItem, PlanApprovalRequest, SessionInfo, WorkState } from './types'
 
-/** A non-live session (its subprocess is gone) that resume() can re-run. */
-export function isRevivableStatus(status: SessionInfo['status']): boolean {
+/** A session that has finished running — its subprocess is gone. The single
+ *  source of truth for "done" used by both resume (revivable) and await. */
+export function isTerminalStatus(status: SessionInfo['status']): boolean {
   return status === 'stopped' || status === 'error' || status === 'completed' || status === 'landed'
+}
+
+/** A non-live session that resume() can re-run (i.e. a terminal one). */
+export function isRevivableStatus(status: SessionInfo['status']): boolean {
+  return isTerminalStatus(status)
 }
 
 /** Persistent work-state implied by a runtime status. Used to seed/refresh
