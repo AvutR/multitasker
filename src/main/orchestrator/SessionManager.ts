@@ -26,6 +26,9 @@ const LIVE_STATUSES = ['queued', 'running', 'awaiting_input', 'awaiting_plan_app
 /** Hard ceiling on sub-agents a single conductor may spawn (runaway-loop guard). */
 const MAX_DELEGATIONS = 25
 
+/** A sub-agent in one of these states is "finished" for await purposes. */
+const TERMINAL_STATUSES = ['completed', 'landed', 'stopped', 'error']
+
 /**
  * Owns the live AgentSession pool. Enforces a concurrency cap: a live session
  * holds a Claude Code subprocess for its lifetime, so spawns over the cap are
@@ -52,7 +55,8 @@ export class SessionManager {
       actions,
       orchestration: {
         delegate: (parentId, input) => this.delegate(parentId, input),
-        listChildren: (parentId) => this.listChildren(parentId)
+        listChildren: (parentId) => this.listChildren(parentId),
+        waitForChildren: (parentId, childIds) => this.waitForChildren(parentId, childIds)
       }
     }
   }
@@ -253,6 +257,38 @@ export class SessionManager {
     return this.list()
       .filter((s) => s.parentId === parentId)
       .map((s) => ({ id: s.id, title: s.title, status: s.status, summary: this.lastAssistantText(s.id) }))
+  }
+
+  /** Block until the named children (or all of a conductor's children) reach a
+   *  terminal state, then return their summaries. Event-driven with a safety
+   *  timeout so a stuck sub-agent can't hang the conductor forever. */
+  private waitForChildren(parentId: string, childIds?: string[], timeoutMs = 15 * 60_000): Promise<{ id: string; title: string; status: string; summary: string }[]> {
+    const targets =
+      childIds && childIds.length
+        ? childIds
+        : this.repos.sessions.list().filter((s) => s.parentId === parentId).map((s) => s.id)
+    const result = () => this.listChildren(parentId).filter((c) => targets.includes(c.id))
+    const allDone = () =>
+      targets.every((id) => {
+        const s = this.repos.sessions.get(id)
+        return !s || TERMINAL_STATUSES.includes(s.status)
+      })
+
+    if (targets.length === 0 || allDone()) return Promise.resolve(result())
+
+    return new Promise((resolve) => {
+      let unsub: (() => void) | null = null
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const finish = () => {
+        unsub?.()
+        if (timer) clearTimeout(timer)
+        resolve(result())
+      }
+      unsub = this.bus.onEvent((e) => {
+        if ((e.channel === 'session:updated' || e.channel === 'session:deleted') && allDone()) finish()
+      })
+      timer = setTimeout(finish, timeoutMs)
+    })
   }
 
   private lastAssistantText(sessionId: string): string {

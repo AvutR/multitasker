@@ -15,6 +15,8 @@ export interface IntegrationServerOptions {
 export interface Orchestration {
   delegate: (parentId: string, input: { title?: string; prompt: string; model?: string; kind?: string }) => Promise<{ id: string; title: string; status: string }>
   listChildren: (parentId: string) => { id: string; title: string; status: string; summary: string }[]
+  /** Block until the given sub-agents (or all of them) finish, then return their results. */
+  waitForChildren: (parentId: string, childIds?: string[]) => Promise<{ id: string; title: string; status: string; summary: string }[]>
 }
 
 /**
@@ -76,6 +78,12 @@ export function createIntegrationMcpServer(actionService: ActionService, session
           'List the sub-agents you have delegated, with their current status and latest output, so you can coordinate, wait, or synthesize their results.',
           {},
           async () => text(JSON.stringify(orchestration.listChildren(sessionId), null, 2))
+        ),
+        tool(
+          'wait_for_subtasks',
+          'BLOCK until the given sub-agents finish (or all of yours if `ids` is omitted), then return each one\'s final status and output. This is how you express dependencies: delegate independent work, then wait_for_subtasks on the pieces the next step depends on before continuing. Returns the completed results — no polling needed.',
+          { ids: z.array(z.string()).optional().describe('Sub-agent ids to wait for; omit to wait for all of them') },
+          async (args) => text(JSON.stringify(await orchestration.waitForChildren(sessionId, args.ids), null, 2))
         )
       ]
     : []

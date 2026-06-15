@@ -449,6 +449,40 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     expect(refused).toMatch(/delegation limit/)
   })
 
+  it('waitForChildren blocks while a sub-agent runs, then resolves on its terminal event', async () => {
+    const { repos, bus, actions } = deps()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = makeInfo(repos, { id: randomUUID() })
+    const child = makeInfo(repos, { parentId: conductor.id, status: 'running' })
+    const orch = (manager as unknown as { deps: { orchestration: { waitForChildren: Function } } }).deps.orchestration
+
+    let resolved = false
+    const waitP = (orch.waitForChildren(conductor.id, [child.id]) as Promise<{ id: string; status: string }[]>).then((r) => {
+      resolved = true
+      return r
+    })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(resolved).toBe(false) // still blocking — child is running
+
+    const done = repos.sessions.update(child.id, { status: 'completed' })!
+    bus.emit({ channel: 'session:updated', payload: done }) // the event waitForChildren listens for
+    const results = await waitP
+    expect(resolved).toBe(true)
+    expect(results.find((c) => c.id === child.id)?.status).toBe('completed')
+  })
+
+  it('waitForChildren returns immediately when all children are already terminal', async () => {
+    const { repos, bus, actions } = deps()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = makeInfo(repos, { id: randomUUID() })
+    makeInfo(repos, { parentId: conductor.id, status: 'completed' })
+    makeInfo(repos, { parentId: conductor.id, status: 'error' })
+    const orch = (manager as unknown as { deps: { orchestration: { waitForChildren: Function } } }).deps.orchestration
+
+    const results = (await orch.waitForChildren(conductor.id)) as unknown[] // no ids → all children
+    expect(results).toHaveLength(2)
+  })
+
   it('parentId round-trips through the session repo (migration 0004)', () => {
     const { repos } = deps()
     const info = makeInfo(repos, { parentId: 'conductor-123' })

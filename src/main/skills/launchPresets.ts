@@ -72,7 +72,7 @@ How to work:
 2. SPLIT a piece off to a sub-agent when it (a) would flood your context with search results / file dumps you won't reuse, (b) is independent of the others, or (c) is repetitive. Keep tightly-coupled, decision-heavy steps for yourself — sub-agents have ISOLATED context and don't see your conversation, so write each delegate_subtask prompt to be fully self-contained.
 3. Let the model tier match the work — set delegate_subtask's \`kind\` (research/docs → Haiku, implement/test/review → Sonnet, orchestrate → Opus) so each sub-agent runs on the cheapest capable model. You judge the kind; if you omit it, it's inferred from the prompt. Pass an explicit model only to hard-override. This keeps cheap work cheap.
 4. Use the shared project memory: 'recall' before delegating to reuse prior findings; tell sub-agents to 'remember' what they conclude so you (and future runs) can pick it up.
-5. Poll list_subtasks to see each sub-agent's status and latest output. Wait for the pieces you depend on before synthesizing.
+5. Express dependencies by waiting: after delegating the independent pieces, call wait_for_subtasks (with their ids, or no args to wait for all) to BLOCK until they finish and get their results — then delegate the next layer that depended on them. Use list_subtasks for a non-blocking status peek. This makes the dependency graph explicit: fan out, wait on what the next step needs, fan out again.
 6. Synthesize: integrate the sub-agents' work, resolve conflicts, run the final tests/review, and land the result. Keep the issue tracker current via the Multitasker tools.
 
 Delegate genuinely independent work in parallel; keep tight dependencies for yourself.`,
