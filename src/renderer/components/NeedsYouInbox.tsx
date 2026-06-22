@@ -23,6 +23,7 @@ export function NeedsYouInbox() {
 
   const items = rankNeedsYou(Object.values(sessions), Object.values(planRequests), actions)
   const running = Object.values(sessions).filter((s) => s.status === 'running').length
+  const actionItems = items.filter((i) => i.kind === 'action' && i.actionId)
 
   const onDecide = (actionId: string, approve: boolean) => {
     if (deciding.has(actionId)) return
@@ -52,8 +53,23 @@ export function NeedsYouInbox() {
     )
   }
 
+  const approveAllActions = () => {
+    for (const it of actionItems) if (it.actionId && !deciding.has(it.actionId)) onDecide(it.actionId, true)
+  }
+
   return (
     <div className="space-y-1.5">
+      {actionItems.length >= 2 && (
+        <div className="flex justify-end">
+          <button
+            onClick={approveAllActions}
+            className="rounded border border-[#5bd4a4]/40 px-2.5 py-1 text-[11px] font-medium text-[#5bd4a4] transition-colors hover:bg-[#5bd4a4]/10"
+            title="Approve every pending connector action at once"
+          >
+            Approve all {actionItems.length} actions ↗
+          </button>
+        </div>
+      )}
       {items.map((item, i) => (
         <div
           key={`${item.kind}-${item.sessionId}-${item.actionId ?? i}`}

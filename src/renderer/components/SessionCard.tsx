@@ -4,7 +4,15 @@ import { useStore } from '../store/store'
 import { Badge, formatCost, StatusDot } from './bits'
 import { Icon } from './Icon'
 
-export function SessionCard({ session }: { session: SessionInfo }) {
+export function SessionCard({
+  session,
+  selected = false,
+  onToggleSelect
+}: {
+  session: SessionInfo
+  selected?: boolean
+  onToggleSelect?: () => void
+}) {
   const select = useStore((s) => s.select)
   const deleteSession = useStore((s) => s.deleteSession)
   const setPinned = useStore((s) => s.setPinned)
@@ -43,14 +51,39 @@ export function SessionCard({ session }: { session: SessionInfo }) {
     }
   }
 
+  // ⌘/Ctrl-click toggles multi-select instead of opening (when selection is wired in).
+  const onCardClick = (e: React.MouseEvent) => {
+    if (onToggleSelect && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      onToggleSelect()
+      return
+    }
+    void select(session.id)
+  }
+
   return (
     <div
       className={`group relative rounded-lg border transition-colors ${
-        needsYou ? 'border-[#f5c451]/50 bg-[#f5c451]/5' : 'border-ink-600 bg-ink-800 hover:bg-ink-700'
-      } ${session.pinned ? 'ring-1 ring-accent/40' : ''}`}
+        selected ? 'border-accent bg-accent/10 ring-1 ring-accent' : needsYou ? 'border-[#f5c451]/50 bg-[#f5c451]/5' : 'border-ink-600 bg-ink-800 hover:bg-ink-700'
+      } ${session.pinned && !selected ? 'ring-1 ring-accent/40' : ''}`}
     >
+      {onToggleSelect && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleSelect()
+          }}
+          title="Select (⌘-click the card) for a batch action"
+          aria-label={selected ? 'Deselect session' : 'Select session'}
+          className={`absolute left-1.5 top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded border text-[9px] transition-opacity ${
+            selected ? 'border-accent bg-accent text-ink-900 opacity-100' : 'border-ink-500 bg-ink-900/70 text-transparent opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          ✓
+        </button>
+      )}
       <button
-        onClick={() => void select(session.id)}
+        onClick={onCardClick}
         className="block w-full rounded-lg p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <div className="flex items-center justify-between gap-2">

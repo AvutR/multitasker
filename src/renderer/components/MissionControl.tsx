@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SessionInfo } from '@shared/types'
 import { groupSessions, idleSessionIds } from '@shared/board'
 import { useStore } from '../store/store'
@@ -13,9 +13,34 @@ export function MissionControl({ onNew }: { onNew: () => void }) {
   const sessions = useStore((s) => s.sessions)
   const order = useStore((s) => s.order)
   const reclaimIdle = useStore((s) => s.reclaimIdle)
+  const steerMany = useStore((s) => s.steerMany)
+  const stopMany = useStore((s) => s.stopMany)
+  const markDoneMany = useStore((s) => s.markDoneMany)
   const [doneCollapsed, setDoneCollapsed] = useState<boolean>(
     () => localStorage.getItem(DONE_COLLAPSED_KEY) !== 'false' // default collapsed (declutter)
   )
+  // Multi-select: ⌘-click cards (or their checkbox) to build a selection, then act
+  // on all at once. "Drive a dozen agents" in one gesture instead of N clicks.
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [batchText, setBatchText] = useState('')
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  const clearSelect = () => setSelected(new Set())
+  const selectedIds = [...selected].filter((id) => sessions[id]) // drop any since-removed
+
+  // Esc clears the selection (a no-op for App's Esc handler on the board view).
+  useEffect(() => {
+    if (selected.size === 0) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelected(new Set())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected.size])
 
   const toggleDone = () =>
     setDoneCollapsed((v) => {
@@ -51,10 +76,12 @@ export function MissionControl({ onNew }: { onNew: () => void }) {
         </div>
       ) : (
         <>
-          <Lane title="Running" sessions={groups.running} />
+          <Lane title="Running" sessions={groups.running} selected={selected} onToggleSelect={toggleSelect} />
           <Lane
             title="Idle"
             sessions={groups.idle}
+            selected={selected}
+            onToggleSelect={toggleSelect}
             action={
               reclaimable > 0 ? (
                 <button onClick={() => void reclaimIdle()} className="text-[11px] text-accent hover:underline" title="Stop live idle sessions to free their concurrency slots">
@@ -63,8 +90,49 @@ export function MissionControl({ onNew }: { onNew: () => void }) {
               ) : undefined
             }
           />
-          <Lane title="Done" sessions={groups.done} collapsed={doneCollapsed} onToggle={toggleDone} />
+          <Lane title="Done" sessions={groups.done} collapsed={doneCollapsed} onToggle={toggleDone} selected={selected} onToggleSelect={toggleSelect} />
         </>
+      )}
+
+      {selectedIds.length > 0 && (
+        <div className="sticky bottom-0 z-20 mt-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-ink-800/95 px-3 py-2 shadow-2xl backdrop-blur">
+          <span className="shrink-0 text-xs font-semibold text-accent">{selectedIds.length} selected</span>
+          <input
+            value={batchText}
+            onChange={(e) => setBatchText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && batchText.trim()) {
+                void steerMany(selectedIds, batchText.trim())
+                setBatchText('')
+                clearSelect()
+              }
+            }}
+            placeholder="Steer all selected…  (↵ to broadcast)"
+            className="min-w-0 flex-1 rounded border border-ink-500 bg-ink-700 px-2 py-1 text-xs"
+          />
+          <button
+            onClick={() => {
+              const t = batchText.trim()
+              if (!t) return
+              void steerMany(selectedIds, t)
+              setBatchText('')
+              clearSelect()
+            }}
+            disabled={!batchText.trim()}
+            className="shrink-0 rounded bg-accent px-2.5 py-1 text-xs font-semibold text-ink-900 disabled:opacity-40 hover:bg-[#8bbcff]"
+          >
+            Send
+          </button>
+          <button onClick={() => { void stopMany(selectedIds); clearSelect() }} className="shrink-0 rounded border border-[#f06d6d]/50 px-2 py-1 text-xs text-[#f06d6d] hover:bg-[#f06d6d]/10">
+            Stop
+          </button>
+          <button onClick={() => { void markDoneMany(selectedIds); clearSelect() }} className="shrink-0 rounded border border-ink-500 px-2 py-1 text-xs text-[#8a93a6] hover:bg-ink-700 hover:text-[#5bd4a4]">
+            Done
+          </button>
+          <button onClick={clearSelect} className="shrink-0 rounded px-2 py-1 text-xs text-[#8a93a6] hover:bg-ink-700" title="Clear selection (Esc)">
+            Clear
+          </button>
+        </div>
       )}
     </section>
   )
@@ -75,13 +143,17 @@ function Lane({
   sessions,
   action,
   collapsed,
-  onToggle
+  onToggle,
+  selected,
+  onToggleSelect
 }: {
   title: string
   sessions: SessionInfo[]
   action?: React.ReactNode
   collapsed?: boolean
   onToggle?: () => void
+  selected?: Set<string>
+  onToggleSelect?: (id: string) => void
 }) {
   if (sessions.length === 0) return null
   const header = (
@@ -109,7 +181,12 @@ function Lane({
       {!collapsed && (
         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
           {sessions.map((s) => (
-            <SessionCard key={s.id} session={s} />
+            <SessionCard
+              key={s.id}
+              session={s}
+              selected={selected?.has(s.id) ?? false}
+              onToggleSelect={onToggleSelect ? () => onToggleSelect(s.id) : undefined}
+            />
           ))}
         </div>
       )}

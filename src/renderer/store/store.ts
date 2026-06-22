@@ -49,6 +49,9 @@ interface State {
   deleteSession: (id: string) => Promise<void>
   setPinned: (id: string, pinned: boolean) => Promise<void>
   markDone: (id: string) => Promise<void>
+  steerMany: (ids: string[], text: string) => Promise<void>
+  stopMany: (ids: string[]) => Promise<void>
+  markDoneMany: (ids: string[]) => Promise<void>
   approvePlan: (id: string, approved: boolean, feedback?: string) => Promise<void>
   setPolicyMode: (actionType: string, mode: PolicyMode) => Promise<void>
   setDryRun: (dryRun: boolean) => Promise<void>
@@ -165,6 +168,17 @@ export const useStore = create<State>((set, get) => ({
   markDone: async (id) => {
     // The session:updated event moves it to the Done lane.
     await window.api.invoke('session:markDone', id)
+  },
+  // Batch ops fan out over the existing per-id IPC — "drive a dozen agents" in one
+  // gesture (broadcast a steer, stop/done a selection) instead of one click each.
+  steerMany: async (ids, text) => {
+    await Promise.all(ids.map((id) => window.api.invoke('session:steer', { id, text })))
+  },
+  stopMany: async (ids) => {
+    await Promise.all(ids.map((id) => window.api.invoke('session:stop', id)))
+  },
+  markDoneMany: async (ids) => {
+    await Promise.all(ids.map((id) => window.api.invoke('session:markDone', id)))
   },
   approvePlan: async (id, approved, feedback) => {
     await window.api.invoke('session:approvePlan', { id, approved, feedback })
