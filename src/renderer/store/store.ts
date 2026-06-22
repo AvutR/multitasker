@@ -78,7 +78,9 @@ export const useStore = create<State>((set, get) => ({
   actions: [],
   policyDefs: [],
   policy: { modes: {}, dryRun: true },
-  settings: { dryRun: true, concurrencyCap: 4, defaultModel: 'claude-opus-4-7' },
+  // Transient placeholder until init() loads real settings; 'opus' is a model
+  // ALIAS (see main/models.ts), matching the DB default — not a raw sdkModel.
+  settings: { dryRun: true, concurrencyCap: 4, defaultModel: 'opus' },
   presets: [],
   repos: [],
   myLinearIssues: [],

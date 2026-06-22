@@ -8,9 +8,13 @@ import type { AppSettings, ModelOption } from '@shared/types'
  * (GPT, Gemini) are reachable — configured via app settings.
  */
 export const MODELS: ModelOption[] = [
-  { id: 'opus', label: 'Claude Opus 4.7', provider: 'anthropic', sdkModel: 'claude-opus-4-7' },
+  // Model ids are stable ALIASES; only the sdkModel string changes when a tier's
+  // underlying model is upgraded — so a stored defaultModel: 'opus' (and every
+  // auto-tiered sub-agent) rides the latest model with no migration.
+  { id: 'opus', label: 'Claude Opus 4.8', provider: 'anthropic', sdkModel: 'claude-opus-4-8' },
   { id: 'sonnet', label: 'Claude Sonnet 4.6', provider: 'anthropic', sdkModel: 'claude-sonnet-4-6' },
-  { id: 'haiku', label: 'Claude Haiku 4.6', provider: 'anthropic', sdkModel: 'claude-haiku-4-6' },
+  { id: 'haiku', label: 'Claude Haiku 4.5', provider: 'anthropic', sdkModel: 'claude-haiku-4-5-20251001' },
+  { id: 'fable', label: 'Claude Fable 5', provider: 'anthropic', sdkModel: 'claude-fable-5' },
   { id: 'bedrock-sonnet', label: 'Claude Sonnet · Bedrock', provider: 'bedrock', sdkModel: 'claude-sonnet-4-6' },
   { id: 'vertex-sonnet', label: 'Claude Sonnet · Vertex', provider: 'vertex', sdkModel: 'claude-sonnet-4-6' }
 ]

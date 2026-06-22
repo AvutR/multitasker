@@ -20,8 +20,17 @@ describe('model registry', () => {
 
   it('resolves an Anthropic model with no env override', () => {
     const r = resolveModel('opus', base)
-    expect(r.sdkModel).toBe('claude-opus-4-7')
+    expect(r.sdkModel).toBe('claude-opus-4-8')
     expect(r.env).toBeUndefined()
+  })
+
+  it('ships the latest tier models: Opus 4.8, Sonnet 4.6, Haiku 4.5, Fable 5', () => {
+    expect(resolveModel('sonnet', base).sdkModel).toBe('claude-sonnet-4-6')
+    // Haiku must be a REAL id (the prior 'claude-haiku-4-6' did not exist).
+    expect(resolveModel('haiku', base).sdkModel).toBe('claude-haiku-4-5-20251001')
+    const fable = listModels(base).find((m) => m.id === 'fable')
+    expect(fable?.sdkModel).toBe('claude-fable-5')
+    expect(fable?.provider).toBe('anthropic')
   })
 
   it('resolves Bedrock/Vertex to the right env flags', () => {
@@ -38,6 +47,6 @@ describe('model registry', () => {
   })
 
   it('falls back to the default model for an unknown id', () => {
-    expect(resolveModel('nope', base).sdkModel).toBe('claude-opus-4-7')
+    expect(resolveModel('nope', base).sdkModel).toBe('claude-opus-4-8')
   })
 })
