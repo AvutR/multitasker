@@ -104,5 +104,9 @@ export const MIGRATIONS: Migration[] = [
   {
     name: '0006_session_task_brief',
     sql: `ALTER TABLE sessions ADD COLUMN task_brief TEXT;`
+  },
+  {
+    name: '0007_session_review_verdict',
+    sql: `ALTER TABLE sessions ADD COLUMN review_verdict TEXT;`
   }
 ]

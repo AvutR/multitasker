@@ -58,7 +58,13 @@ export interface SessionInfo {
   parentId?: string | null
   /** The per-task context brief generated at spawn (what primed the agent). */
   taskBrief?: string | null
+  /** Auto risk verdict on the finished diff (from blast radius), so the review
+   *  queue surfaces the risky work first. Absent until the session completes. */
+  reviewVerdict?: ReviewVerdict | null
 }
+
+/** Risk triage for a finished diff: review the risky ones, one-click-land the safe. */
+export type ReviewVerdict = 'safe' | 'needs-eyes' | 'likely-wrong'
 
 // ---------------------------------------------------------------------------
 // Transcript (streamed agent output, persisted in UI-friendly shape)

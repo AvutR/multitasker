@@ -92,6 +92,16 @@ describe('rankNeedsYou', () => {
     ]
     expect(rankNeedsYou(sessions, [], [], NOW)).toEqual([])
   })
+
+  it('orders review items by risk verdict — likely-wrong above needs-eyes above safe', () => {
+    const sessions = [
+      session({ id: 'safe1', status: 'completed', reviewVerdict: 'safe', updatedAt: NOW }),
+      session({ id: 'bad1', status: 'completed', reviewVerdict: 'likely-wrong', updatedAt: NOW }),
+      session({ id: 'eyes1', status: 'completed', reviewVerdict: 'needs-eyes', updatedAt: NOW })
+    ]
+    const ranked = rankNeedsYou(sessions, [], [], NOW)
+    expect(ranked.map((r) => r.sessionId)).toEqual(['bad1', 'eyes1', 'safe1']) // risky first
+  })
 })
 
 describe('groupSessions', () => {

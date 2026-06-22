@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
 import { idleSessionIds, isTerminalStatus } from '@shared/board'
 import { classifySubtask, recommendModelForSubtask, tierForKind, TASK_KINDS } from '@shared/modelTier'
+import { computeBlastRadius, reviewVerdict } from '@shared/blastRadius'
 import { buildTaskBrief } from '@shared/taskBrief'
 import { recall } from '../integrations/agentMemory'
 import { projectRoot } from '../util/projectRoot'
@@ -9,7 +10,7 @@ import { writeWorktreeBrief } from '../util/taskBriefFile'
 import type { Repositories } from '../db/repositories'
 import type { EventBus } from '../events'
 import type { ActionService } from '../integrations/ActionService'
-import type { WorktreeManager } from '../git/Worktrees'
+import { computeDiff, type WorktreeManager } from '../git/Worktrees'
 import { DEFAULT_PRESET_ID, getPreset, launchOptionsFor } from '../skills/launchPresets'
 import { resolvePresetId } from '../skills/taskRouter'
 import { AgentSession, type SessionDeps } from './AgentSession'
@@ -500,7 +501,26 @@ export class SessionManager {
     void item.session.whenDone().finally(() => {
       this.active -= 1
       this.pump()
+      void this.recordVerdict(item.session.id) // triage the finished diff for the review queue
     })
+  }
+
+  /** When a top-level session finishes, score its diff (blast radius → verdict) so
+   *  the review queue surfaces the risky work first. Free + deterministic; the
+   *  verdict is an optimization, so failures are swallowed. */
+  private async recordVerdict(id: string): Promise<void> {
+    try {
+      const info = this.repos.sessions.get(id)
+      // Only completed TOP-LEVEL work — sub-agents share the parent's worktree, so
+      // the parent's verdict covers the whole change.
+      if (!info || info.status !== 'completed' || info.parentId) return
+      const files = await computeDiff(info.cwd)
+      if (!files.length) return // nothing changed → nothing to review
+      const updated = this.repos.sessions.update(id, { reviewVerdict: reviewVerdict(computeBlastRadius(files)) })
+      if (updated) this.bus.emit({ channel: 'session:updated', payload: updated })
+    } catch {
+      // best-effort — never let verdict scoring disturb the run lifecycle
+    }
   }
 
   private pump(): void {

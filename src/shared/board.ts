@@ -26,6 +26,17 @@ export function deriveWorkState(status: SessionInfo['status']): WorkState {
 const KIND_WEIGHT: Record<NeedsYouItem['kind'], number> = { error: 300, plan: 200, action: 100, review: 50 }
 const MAX_AGE_BOOST = 99
 
+// Within the review kind, the risk verdict orders the queue: review the risky
+// diffs first, one-click-land the safe ones. (Boosts stay < KIND_WEIGHT gaps so a
+// likely-wrong review can never outrank a real blocker.)
+const VERDICT_BOOST: Record<string, number> = { 'likely-wrong': 30, 'needs-eyes': 15, unscored: 6, safe: 0 }
+const VERDICT_DETAIL: Record<string, string> = {
+  'likely-wrong': 'Likely wrong — big reach, no tests. Review closely.',
+  'needs-eyes': 'Needs your eyes — risky diff (reach / tests / sensitive paths).',
+  safe: 'Looks safe — contained & tested.',
+  unscored: 'Finished — review the diff.'
+}
+
 /**
  * The attention queue's ranking — the product's "brain". Unifies three signals
  * into one ordered list: errored sessions, sessions blocked on plan approval,
@@ -58,12 +69,14 @@ export function rankNeedsYou(
   // user lands it (→ landed), marks it done (→ stopped), or resumes it.
   for (const s of sessions) {
     if (s.status === 'completed') {
-      items.push({ kind: 'review', sessionId: s.id, title: s.title, detail: 'Finished — review the diff', waitedMs: Math.max(0, now - s.updatedAt), priority: 0 })
+      const v = s.reviewVerdict ?? 'unscored'
+      // Seed the verdict boost; the loop below adds the kind weight + age on top.
+      items.push({ kind: 'review', sessionId: s.id, title: s.title, detail: VERDICT_DETAIL[v] ?? VERDICT_DETAIL.unscored, waitedMs: Math.max(0, now - s.updatedAt), priority: VERDICT_BOOST[v] ?? VERDICT_BOOST.unscored })
     }
   }
 
   for (const item of items) {
-    item.priority = KIND_WEIGHT[item.kind] + Math.min(MAX_AGE_BOOST, Math.floor(item.waitedMs / 1000))
+    item.priority += KIND_WEIGHT[item.kind] + Math.min(MAX_AGE_BOOST, Math.floor(item.waitedMs / 1000))
   }
   return items.sort((a, b) => b.priority - a.priority)
 }

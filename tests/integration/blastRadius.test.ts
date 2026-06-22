@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DiffFile, DiffStatus } from '@shared/types'
-import { computeBlastRadius, landRisk } from '../../src/shared/blastRadius'
+import { computeBlastRadius, landRisk, reviewVerdict } from '../../src/shared/blastRadius'
 
 function file(relPath: string, additions = 5, deletions = 2, status: DiffStatus = 'modified'): DiffFile {
   return { relPath, status, additions, deletions, oldContent: '', newContent: '' }
@@ -43,6 +43,29 @@ describe('computeBlastRadius', () => {
     expect(reasons).toContain('lockfile')
     expect(reasons).toContain('CI/CD pipeline')
     expect(b.level === 'high' || b.level === 'critical').toBe(true) // sensitive files dominate
+  })
+
+  it('reviewVerdict triages the finished diff for the queue', () => {
+    // safe: contained change with tests present.
+    const safe = computeBlastRadius([file('src/renderer/components/Foo.tsx', 8, 1), file('tests/integration/foo.test.ts', 6, 0)])
+    expect(reviewVerdict(safe)).toBe('safe')
+
+    // likely-wrong: sweeping + sensitive change with NO tests (a real test gap).
+    const bad = computeBlastRadius([
+      file('src/main/db/migrations.ts', 80, 10),
+      file('src/main/auth/login.ts', 60, 30),
+      file('package-lock.json', 300, 120),
+      file('.github/workflows/deploy.yml', 40, 5),
+      file('src/renderer/components/X.tsx', 50, 5)
+    ])
+    expect(bad.testGap).toBe(true)
+    expect(reviewVerdict(bad)).toBe('likely-wrong')
+
+    // needs-eyes: touches a sensitive path (migration) but tests are present.
+    const eyes = computeBlastRadius([file('src/main/db/migrations.ts', 20, 4), file('tests/integration/m.test.ts', 10, 0)])
+    expect(eyes.testGap).toBe(false)
+    expect(eyes.criticalHits.length).toBeGreaterThan(0)
+    expect(reviewVerdict(eyes)).toBe('needs-eyes')
   })
 
   it('escalates to critical for a sprawling, sensitive change', () => {

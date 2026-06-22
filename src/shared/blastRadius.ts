@@ -1,4 +1,4 @@
-import type { DiffFile, DiffStatus } from './types'
+import type { DiffFile, DiffStatus, ReviewVerdict } from './types'
 
 /**
  * Blast-radius detection — the "what's the worst case, and how much does this
@@ -189,6 +189,20 @@ export function landRisk(blast: BlastRadius): { risky: boolean; reasons: string[
   if (critical.length) reasons.push(`touches ${critical.slice(0, 2).join(', ')}`)
   const risky = blast.level === 'high' || blast.level === 'critical' || blast.testGap
   return { risky, reasons }
+}
+
+/**
+ * Auto risk triage for a finished diff, derived from blast radius — so the review
+ * queue surfaces the risky work first and the safe work can be one-click-landed.
+ * - likely-wrong: the worst combo — sweeping reach AND no tests to catch a regression.
+ * - needs-eyes: risky by the land gate (high/critical reach, a test gap, or a
+ *   sensitive-path hit like auth/migrations/public API).
+ * - safe: contained, tested, nothing sensitive.
+ */
+export function reviewVerdict(blast: BlastRadius): ReviewVerdict {
+  if (blast.testGap && (blast.level === 'critical' || blast.level === 'high')) return 'likely-wrong'
+  if (landRisk(blast).risky || blast.criticalHits.length > 0) return 'needs-eyes'
+  return 'safe'
 }
 
 export const BLAST_META: Record<BlastLevel, { label: string; color: string }> = {

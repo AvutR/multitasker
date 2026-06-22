@@ -43,6 +43,7 @@ interface SessionRow {
   input_tokens: number
   output_tokens: number
   task_brief: string | null
+  review_verdict: string | null
 }
 
 interface MessageRow {
@@ -98,7 +99,8 @@ function toSession(r: SessionRow): SessionInfo {
     parentId: r.parent_id,
     inputTokens: r.input_tokens,
     outputTokens: r.output_tokens,
-    taskBrief: r.task_brief
+    taskBrief: r.task_brief,
+    reviewVerdict: (r.review_verdict as SessionInfo['reviewVerdict']) ?? null
   }
 }
 
@@ -115,7 +117,8 @@ function bindSession(s: SessionInfo): Record<string, unknown> {
     parentId: s.parentId ?? null,
     inputTokens: s.inputTokens ?? 0,
     outputTokens: s.outputTokens ?? 0,
-    taskBrief: s.taskBrief ?? null
+    taskBrief: s.taskBrief ?? null,
+    reviewVerdict: s.reviewVerdict ?? null
   }
 }
 
@@ -159,10 +162,10 @@ export class SessionRepo {
       .prepare(
         `INSERT INTO sessions (id, sdk_session_id, title, model, cwd, repo_id, branch, worktree_path,
            status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error,
-           pinned, work_state, linear_issue_id, notion_page_id, parent_id, input_tokens, output_tokens, task_brief)
+           pinned, work_state, linear_issue_id, notion_page_id, parent_id, input_tokens, output_tokens, task_brief, review_verdict)
          VALUES (@id, @sdkSessionId, @title, @model, @cwd, @repoId, @branch, @worktreePath,
            @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error,
-           @pinned, @workState, @linearIssueId, @notionPageId, @parentId, @inputTokens, @outputTokens, @taskBrief)`
+           @pinned, @workState, @linearIssueId, @notionPageId, @parentId, @inputTokens, @outputTokens, @taskBrief, @reviewVerdict)`
       )
       .run(bindSession(s))
   }
@@ -184,7 +187,7 @@ export class SessionRepo {
            permission_mode=@permissionMode, preset_id=@presetId, total_cost_usd=@totalCostUsd,
            num_turns=@numTurns, updated_at=@updatedAt, error=@error,
            work_state=@workState, linear_issue_id=@linearIssueId, notion_page_id=@notionPageId,
-           parent_id=@parentId, input_tokens=@inputTokens, output_tokens=@outputTokens
+           parent_id=@parentId, input_tokens=@inputTokens, output_tokens=@outputTokens, review_verdict=@reviewVerdict
          WHERE id=@id`
       )
       .run(bindSession(next))
