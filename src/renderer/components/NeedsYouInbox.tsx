@@ -4,8 +4,8 @@ import { rankNeedsYou } from '@shared/board'
 import { useStore } from '../store/store'
 import { Icon } from './Icon'
 
-const KIND_GLYPH: Record<NeedsYouItem['kind'], string> = { error: '✕', plan: '◆', action: '↗' }
-const KIND_COLOR: Record<NeedsYouItem['kind'], string> = { error: '#f06d6d', plan: '#f5c451', action: '#6ea8fe' }
+const KIND_GLYPH: Record<NeedsYouItem['kind'], string> = { error: '✕', plan: '◆', action: '↗', review: '✓' }
+const KIND_COLOR: Record<NeedsYouItem['kind'], string> = { error: '#f06d6d', plan: '#f5c451', action: '#6ea8fe', review: '#5bd4a4' }
 
 export function NeedsYouInbox() {
   const sessions = useStore((s) => s.sessions)
@@ -16,6 +16,7 @@ export function NeedsYouInbox() {
   const decideAction = useStore((s) => s.decideAction)
   const deleteSession = useStore((s) => s.deleteSession)
   const resume = useStore((s) => s.resume)
+  const markDone = useStore((s) => s.markDone)
   // Disable an action's buttons the instant it's clicked, so the (brief) window
   // before the item leaves the queue can't be double-clicked.
   const [deciding, setDeciding] = useState<Set<string>>(() => new Set())
@@ -109,6 +110,16 @@ export function NeedsYouInbox() {
                 </button>
                 <button onClick={() => onDelete(item.sessionId, item.title)} title="Delete session" aria-label="Delete session" className="rounded px-2 py-1 text-[11px] text-[#8a93a6] hover:bg-[#f06d6d]/10 hover:text-[#f06d6d]">
                   Delete
+                </button>
+              </>
+            )}
+            {item.kind === 'review' && (
+              <>
+                <button onClick={() => void select(item.sessionId)} title="Open the session to review its diff and land or steer it" className="rounded bg-[#5bd4a4] px-2 py-1 text-[11px] font-semibold text-ink-900 hover:bg-[#6fe0b6]">
+                  Review
+                </button>
+                <button onClick={() => void markDone(item.sessionId)} title="Dismiss — move to Done without reviewing" className="rounded border border-ink-500 px-2 py-1 text-[11px] text-[#8a93a6] hover:bg-ink-700">
+                  Done
                 </button>
               </>
             )}

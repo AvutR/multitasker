@@ -73,6 +73,25 @@ describe('rankNeedsYou', () => {
   it('is empty when nothing needs attention', () => {
     expect(rankNeedsYou([session({ status: 'running' })], [], [], NOW)).toEqual([])
   })
+
+  it('surfaces a completed session as a review item, ranked below blockers', () => {
+    const sessions = [
+      session({ id: 'e', status: 'error', error: 'boom', updatedAt: NOW }),
+      session({ id: 'done1', status: 'completed', title: 'finished work', updatedAt: NOW - 1000 })
+    ]
+    const ranked = rankNeedsYou(sessions, [], [], NOW)
+    expect(ranked.map((r) => r.kind)).toEqual(['error', 'review']) // review sits below the blocker
+    expect(ranked.find((r) => r.kind === 'review')?.sessionId).toBe('done1')
+  })
+
+  it('reviews ONLY completed sessions — not landed/stopped/running (those already had your hand)', () => {
+    const sessions = [
+      session({ id: 'l', status: 'landed' }),
+      session({ id: 's', status: 'stopped' }),
+      session({ id: 'r', status: 'running' })
+    ]
+    expect(rankNeedsYou(sessions, [], [], NOW)).toEqual([])
+  })
 })
 
 describe('groupSessions', () => {

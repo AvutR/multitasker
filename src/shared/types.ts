@@ -109,7 +109,7 @@ export interface PlanApprovalRequest {
 // Mission Control board + "Needs you" inbox
 // ---------------------------------------------------------------------------
 
-export type NeedsYouKind = 'error' | 'plan' | 'action'
+export type NeedsYouKind = 'error' | 'plan' | 'action' | 'review'
 
 /** A ranked item in the "Needs you" attention queue. */
 export interface NeedsYouItem {

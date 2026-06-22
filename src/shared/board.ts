@@ -23,7 +23,7 @@ export function deriveWorkState(status: SessionInfo['status']): WorkState {
 
 // Kind dominates the rank (error > plan > action); wait-time only breaks ties
 // within a kind (capped so it can never outrank a more urgent kind).
-const KIND_WEIGHT: Record<NeedsYouItem['kind'], number> = { error: 300, plan: 200, action: 100 }
+const KIND_WEIGHT: Record<NeedsYouItem['kind'], number> = { error: 300, plan: 200, action: 100, review: 50 }
 const MAX_AGE_BOOST = 99
 
 /**
@@ -51,6 +51,14 @@ export function rankNeedsYou(
   for (const a of actions) {
     if (a.status === 'pending') {
       items.push({ kind: 'action', sessionId: a.sessionId ?? '', actionId: a.id, title: a.summary, detail: `${a.connector} action awaiting approval`, waitedMs: Math.max(0, now - a.createdAt), priority: 0 })
+    }
+  }
+  // Finished work pulls too: an agent that ran to completion on its own is
+  // "done, diff ready, your move". Ranked below blockers; clears the moment the
+  // user lands it (→ landed), marks it done (→ stopped), or resumes it.
+  for (const s of sessions) {
+    if (s.status === 'completed') {
+      items.push({ kind: 'review', sessionId: s.id, title: s.title, detail: 'Finished — review the diff', waitedMs: Math.max(0, now - s.updatedAt), priority: 0 })
     }
   }
 
