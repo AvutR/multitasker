@@ -15,6 +15,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const strategy = settings.tieringStrategy ?? 'auto'
   const [gwOpen, setGwOpen] = useState(Boolean(settings.gatewayBaseUrl))
   const [budget, setBudget] = useState(settings.budgetUsd ? String(settings.budgetUsd) : '')
+  const [convBudget, setConvBudget] = useState(settings.delegateBudgetUsd ? String(settings.delegateBudgetUsd) : '')
 
   const set = (p: Parameters<typeof patch>[0]) => void patch(p)
 
@@ -116,6 +117,18 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 </div>
               </Row>
             )}
+            <Row label="Per-conductor budget" hint="Hard $ cap on one conductor's fan-out; new sub-agents refused past it. Blank = none.">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-[#6b7280]">$</span>
+                <input
+                  value={convBudget}
+                  onChange={(e) => setConvBudget(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onBlur={() => set({ delegateBudgetUsd: Number(convBudget) > 0 ? Number(convBudget) : 0 })}
+                  placeholder="none"
+                  className="w-20 rounded border border-ink-500 bg-ink-700 px-1.5 py-0.5 text-right tabular-nums"
+                />
+              </div>
+            </Row>
           </Section>
 
           {/* Gateway */}

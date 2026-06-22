@@ -167,7 +167,12 @@ export class SessionManager {
     this.repos.sessions.insert(info)
     this.bus.emit({ channel: 'session:updated', payload: info })
 
-    const session = new AgentSession(this.deps, info, {
+    // Depth cap: only TOP-LEVEL sessions orchestrate. A delegated sub-agent
+    // (parentId set) is a plain worker with NO delegate capability, so a fan-out
+    // can't recurse into a 25^depth session explosion (the per-parent
+    // MAX_DELEGATIONS only bounds one level).
+    const deps = req.parentId ? { ...this.deps, orchestration: undefined } : this.deps
+    const session = new AgentSession(deps, info, {
       systemPromptAppend,
       isBuildPipeline: Boolean(preset.isBuildPipeline),
       // A delegated sub-agent (parentId set; only delegate() spawns with one) is a
@@ -254,6 +259,15 @@ export class SessionManager {
     }
     const parent = this.repos.sessions.get(parentId)
     const settings = this.repos.settings.get()
+    // Per-conductor budget: a hard $ ceiling on ONE orchestration's fan-out (count
+    // ≠ cost — 25 Opus children ≠ 25 Haiku lookups). Refuse new delegations once
+    // the subtree's spend crosses it, so a conductor can't quietly run up the bill.
+    if (settings.delegateBudgetUsd && settings.delegateBudgetUsd > 0) {
+      const subtreeSpend = this.subtreeCost(parentId)
+      if (subtreeSpend >= settings.delegateBudgetUsd) {
+        return { id: '', title: input.title ?? '', status: `refused — conductor budget ($${settings.delegateBudgetUsd}) reached ($${subtreeSpend.toFixed(2)} spent)` }
+      }
+    }
     // Pick the model for this sub-task. Order of confidence:
     //   explicit model > (auto strategy only:) judged kind > keyword auto-detect
     //   > the configured delegate default.
@@ -277,6 +291,9 @@ export class SessionManager {
       presetId: 'explore', // sub-agents are plain workers
       model,
       title: input.title,
+      // Inherit (never weaken) the conductor's permission mode — delegation must
+      // not silently de-escalate a plan-gated conductor into ungated children.
+      permissionMode: parent?.permissionMode,
       parentId,
       useWorktree: false // share the conductor's worktree so sub-agents collaborate
     })
@@ -342,6 +359,17 @@ export class SessionManager {
       })
       timer = setTimeout(finish, timeoutMs)
     })
+  }
+
+  /** Total spend across a conductor and all its descendants (the orchestration
+   *  subtree). Recursive so it stays correct even if the depth policy changes. */
+  private subtreeCost(rootId: string): number {
+    const all = this.repos.sessions.list()
+    const sum = (id: string): number => {
+      const self = all.find((s) => s.id === id)?.totalCostUsd ?? 0
+      return all.filter((s) => s.parentId === id).reduce((acc, s) => acc + sum(s.id), self)
+    }
+    return sum(rootId)
   }
 
   private lastAssistantText(sessionId: string): string {

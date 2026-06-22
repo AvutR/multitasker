@@ -28,6 +28,7 @@ import { AgentSession } from '../../src/main/orchestrator/AgentSession'
 import { SessionManager } from '../../src/main/orchestrator/SessionManager'
 import { LifecycleAutomation } from '../../src/main/orchestrator/LifecycleAutomation'
 import { WorktreeManager } from '../../src/main/git/Worktrees'
+import { createIntegrationMcpServer } from '../../src/main/integrations/integrationMcpServer'
 
 function deps() {
   const db = openDatabase(':memory:')
@@ -718,6 +719,48 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     repos.sessions.update(c1.id, { totalCostUsd: 5 })
     const b = (await orch.delegate(c1.id, { title: 'B', prompt: 'do B' })) as { id: string }
     expect(manager.list().find((s) => s.id === b.id)?.model).toBe('opus')
+  })
+
+  it('depth cap: an orchestrating session exposes delegate_subtask; a delegated child (no orchestration) does not', () => {
+    const { actions } = deps()
+    const orchestration = {
+      delegate: async () => ({ id: 'x', title: '', status: '' }),
+      listChildren: () => [],
+      waitForChildren: async () => []
+    }
+    const withOrch = createIntegrationMcpServer(actions, 's1', { orchestration, memoryRoot: '/tmp' }) as unknown as { tools: { name: string }[] }
+    const childServer = createIntegrationMcpServer(actions, 's2', { orchestration: undefined, memoryRoot: '/tmp' }) as unknown as { tools: { name: string }[] }
+    expect(withOrch.tools.some((t) => t.name === 'delegate_subtask')).toBe(true)
+    // A child gets NO delegate capability → a fan-out can't recurse (25^depth).
+    expect(childServer.tools.some((t) => t.name === 'delegate_subtask')).toBe(false)
+    expect(childServer.tools.some((t) => t.name === 'remember')).toBe(true) // memory tools still present
+  })
+
+  it('refuses delegation once the conductor subtree crosses the per-conductor budget', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8, delegateBudgetUsd: 5 })
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'go', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    repos.sessions.update(conductor.id, { totalCostUsd: 6 }) // subtree spend over the $5 cap
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    const r = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string; status: string }
+    expect(r.id).toBe('')
+    expect(r.status).toMatch(/conductor budget/)
+  })
+
+  it('a delegated child inherits the conductor’s permission mode (no silent de-escalation)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8 })
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'go', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    repos.sessions.update(conductor.id, { permissionMode: 'plan' }) // a plan-gated conductor
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    const child = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string }
+    expect(manager.list().find((s) => s.id === child.id)?.permissionMode).toBe('plan')
   })
 
   it('parentId round-trips through the session repo (migration 0004)', () => {

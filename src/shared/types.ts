@@ -273,6 +273,9 @@ export interface AppSettings {
    *  sub-agents one rung cheaper (opus→sonnet→haiku) so a fan-out can't keep
    *  running up the bill at the priciest tier. Never blocks the user's own work. */
   overBudgetMode?: 'off' | 'downshift'
+  /** Hard $ ceiling on ONE conductor's fan-out (its subtree). Once crossed, new
+   *  delegations are refused. 0/undefined = no per-conductor cap. */
+  delegateBudgetUsd?: number
   // Optional Anthropic-compatible gateway for non-Anthropic providers
   // (LiteLLM / OpenRouter / Bedrock-proxy / etc.).
   gatewayBaseUrl?: string
