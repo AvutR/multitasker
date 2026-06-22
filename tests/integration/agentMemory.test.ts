@@ -53,4 +53,30 @@ describe('agent memory — remember / recall (shared by project root)', () => {
     remember('/repo/a', 'two')
     expect(listMemory('/repo/a').map((n) => n.text)).toEqual(['two', 'one'])
   })
+
+  it('ranks recall by token overlap (most-relevant first), not brittle substring', () => {
+    remember('/repo/a', 'the auth middleware validates the session token')
+    remember('/repo/a', 'the orders table has a foreign key to users')
+    remember('/repo/a', 'rate limiting uses a redis token bucket')
+    const hits = recall('/repo/a', 'auth token validation')
+    expect(hits[0].text).toContain('auth middleware') // shares auth+token → top
+    expect(hits.map((n) => n.text).some((t) => t.includes('redis token bucket'))).toBe(true) // shares token
+    expect(hits.some((n) => n.text.includes('orders table'))).toBe(false) // no overlap → excluded
+  })
+
+  it('protects tagged (durable) notes from FIFO eviction past the cap', () => {
+    remember('/repo/a', 'AUTH lives in src/main/auth', 'arch') // durable, written first
+    for (let i = 0; i < 520; i++) remember('/repo/a', `chatter ${i}`) // flood past MAX_NOTES (500)
+    const all = listMemory('/repo/a')
+    expect(all.length).toBeLessThanOrEqual(500)
+    expect(all.some((n) => n.tag === 'arch' && n.text.includes('AUTH lives'))).toBe(true) // survived
+  })
+
+  it('dedups an exact-duplicate note (same text + tag), keeps tag variants', () => {
+    remember('/repo/a', 'shared finding', 'arch')
+    remember('/repo/a', 'shared finding', 'arch') // exact dup → collapsed
+    remember('/repo/a', 'shared finding', 'gotcha') // different tag → kept
+    remember('/repo/a', 'shared finding') // no tag → kept
+    expect(listMemory('/repo/a').filter((n) => n.text === 'shared finding')).toHaveLength(3)
+  })
 })

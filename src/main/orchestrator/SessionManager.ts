@@ -134,7 +134,12 @@ export class SessionManager {
     let taskBrief: string | null = null
     try {
       const root = await projectRoot(req.cwd)
-      taskBrief = buildTaskBrief({ title, issueIdentifier: req.linearIssueId ?? null, notes: recall(root, undefined, 5) })
+      // Prefer notes RELEVANT to this task (overlap with the prompt+title) over the
+      // 5 most-recent; fall back to recency when nothing is relevant. A delegated
+      // sub-agent thus gets context on ITS sub-task, not the newest global chatter.
+      const relevant = recall(root, `${title} ${req.prompt}`, 5)
+      const notes = relevant.length ? relevant : recall(root, undefined, 5)
+      taskBrief = buildTaskBrief({ title, issueIdentifier: req.linearIssueId ?? null, notes })
       if (worktreePath) await writeWorktreeBrief(worktreePath, taskBrief)
       else systemPromptAppend = `${preset.systemPromptAppend}\n\n${taskBrief}`
     } catch {
