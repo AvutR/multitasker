@@ -268,6 +268,11 @@ export interface AppSettings {
   tieringStrategy?: 'auto' | 'fixed'
   /** Soft spend cap (USD) for the budget guardrail. 0/undefined = no budget. */
   budgetUsd?: number
+  /** What the budget guardrail DOES once spend crosses budgetUsd. 'off' (default)
+   *  is passive (just the header warning); 'downshift' auto-tiers newly-delegated
+   *  sub-agents one rung cheaper (opus→sonnet→haiku) so a fan-out can't keep
+   *  running up the bill at the priciest tier. Never blocks the user's own work. */
+  overBudgetMode?: 'off' | 'downshift'
   // Optional Anthropic-compatible gateway for non-Anthropic providers
   // (LiteLLM / OpenRouter / Bedrock-proxy / etc.).
   gatewayBaseUrl?: string

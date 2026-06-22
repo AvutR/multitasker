@@ -26,6 +26,14 @@ const LIVE_STATUSES = ['queued', 'running', 'awaiting_input', 'awaiting_plan_app
 /** Hard ceiling on sub-agents a single conductor may spawn (runaway-loop guard). */
 const MAX_DELEGATIONS = 25
 
+/** One tier cheaper for the over-budget guardrail; haiku is the floor, and any
+ *  non-tier model id (gateway/fable/bedrock/…) is left untouched. */
+function downshiftTier(model: string): string {
+  if (model === 'opus') return 'sonnet'
+  if (model === 'sonnet') return 'haiku'
+  return model
+}
+
 /**
  * Owns the live AgentSession pool. Enforces a concurrency cap: a live session
  * holds a Claude Code subprocess for its lifetime, so spawns over the cap are
@@ -254,7 +262,15 @@ export class SessionManager {
     // giving the user full control over sub-agent model assignment.
     const judged = input.kind && (TASK_KINDS as string[]).includes(input.kind) ? tierForKind(input.kind as (typeof TASK_KINDS)[number]) : null
     const autoTier = (settings.tieringStrategy ?? 'auto') === 'auto' ? (judged ?? recommendModelForSubtask(input.prompt)) : null
-    const model = input.model ?? autoTier ?? settings.delegateModel ?? 'sonnet'
+    let model = input.model ?? autoTier ?? settings.delegateModel ?? 'sonnet'
+    // Active budget guardrail: once spend crosses the soft budget, downshift
+    // newly-delegated sub-agents one tier cheaper (opt-in 'downshift' mode), so a
+    // fan-out can't keep billing at the priciest tier. The user's own sessions are
+    // never touched — only auto-fanned-out workers.
+    if (settings.overBudgetMode === 'downshift' && settings.budgetUsd && settings.budgetUsd > 0) {
+      const spent = this.repos.sessions.list().reduce((sum, s) => sum + s.totalCostUsd, 0)
+      if (spent >= settings.budgetUsd) model = downshiftTier(model)
+    }
     const child = await this.spawn({
       prompt: input.prompt,
       cwd: parent?.cwd ?? process.cwd(),

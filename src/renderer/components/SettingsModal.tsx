@@ -99,6 +99,23 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 />
               </div>
             </Row>
+            {Number(budget) > 0 && (
+              <Row label="When over budget" hint="Warn only is passive; Downshift auto-tiers new sub-agents cheaper.">
+                <div className="flex gap-1">
+                  {(['off', 'downshift'] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => set({ overBudgetMode: m })}
+                      className={`rounded px-2 py-1 text-[11px] font-medium ${
+                        (settings.overBudgetMode ?? 'off') === m ? 'bg-accent/20 text-accent' : 'bg-ink-700 text-[#8a93a6] hover:bg-ink-600'
+                      }`}
+                    >
+                      {m === 'off' ? 'Warn only' : 'Downshift sub-agents'}
+                    </button>
+                  ))}
+                </div>
+              </Row>
+            )}
           </Section>
 
           {/* Gateway */}

@@ -47,6 +47,9 @@ export class AgentSession {
   // so a stopped session needs a fresh queue AND a fresh controller to run again.
   private queue = new AsyncQueue<unknown>()
   private abort = new AbortController()
+  // The initial user prompt, retained so a transient PRE-init failure can be
+  // safely retried by rebuilding the input (null for a no-prompt wake).
+  private firstPrompt: string | null = null
   private readonly gate: (toolName: string, input: Record<string, unknown>) => Promise<GateDecision>
   private planResolver: ((d: PlanDecision) => void) | null = null
   private donePromise: Promise<void> = Promise.resolve()
@@ -76,6 +79,7 @@ export class AgentSession {
   start(prompt: string): void {
     this.queue = new AsyncQueue<unknown>()
     this.abort = new AbortController()
+    this.firstPrompt = prompt
     this.queue.push(userMessage(prompt))
     this.donePromise = this.run(undefined)
   }
@@ -93,6 +97,7 @@ export class AgentSession {
     this.queue = new AsyncQueue<unknown>()
     this.abort = new AbortController()
     const wake = prompt.trim().length === 0
+    this.firstPrompt = wake ? null : prompt
     if (!wake) this.queue.push(userMessage(prompt))
     this.donePromise = this.run({ resume: this.info.sdkSessionId ?? undefined, fork, wake })
   }
@@ -202,20 +207,57 @@ export class AgentSession {
       if (resume.fork) options.forkSession = true
     }
 
-    try {
-      for await (const msg of query({ prompt: this.queue, options })) {
-        this.handle(msg)
-      }
-      if (this.info.status !== 'stopped' && this.info.status !== 'landed') {
-        this.patch({ status: 'completed' })
-      }
-    } catch (err) {
-      if (abort.signal.aborted) {
-        this.patch({ status: 'stopped' })
+    for (let attempt = 0; ; attempt++) {
+      try {
+        for await (const msg of query({ prompt: this.queue, options })) {
+          this.handle(msg)
+        }
+        if (this.info.status !== 'stopped' && this.info.status !== 'landed') {
+          this.patch({ status: 'completed' })
+        }
+        return
+      } catch (err) {
+        if (abort.signal.aborted) {
+          this.patch({ status: 'stopped' })
+          return
+        }
+        const cls = classifyError(err)
+        const prompt = this.firstPrompt
+        // Auto-recover ONLY a transient failure that hit BEFORE the session
+        // initialized (no sdkSessionId yet) — the prompt was never processed, so a
+        // clean restart with backoff is safe and idempotent. A mid-run failure
+        // (sdkSessionId set) is surfaced with an actionable message for one-click
+        // Resume, rather than risking a duplicated/corrupted turn on auto-retry.
+        if (cls.transient && !this.info.sdkSessionId && prompt != null && attempt < MAX_STARTUP_RETRIES) {
+          const resumed = await this.backoff(1000 * 2 ** attempt, abort) // 1s, 2s, 4s
+          if (!resumed) {
+            this.patch({ status: 'stopped' }) // aborted during backoff
+            return
+          }
+          this.queue = new AsyncQueue<unknown>() // the failed attempt may have drained the input
+          this.queue.push(userMessage(prompt))
+          continue
+        }
+        this.patch({ status: 'error', error: cls.message })
         return
       }
-      this.patch({ status: 'error', error: err instanceof Error ? err.message : String(err) })
     }
+  }
+
+  /** Abortable backoff sleep. Resolves true after `ms`, or false if aborted. */
+  private backoff(ms: number, abort: AbortController): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (abort.signal.aborted) return resolve(false)
+      const onAbort = () => {
+        clearTimeout(timer)
+        resolve(false)
+      }
+      const timer = setTimeout(() => {
+        abort.signal.removeEventListener('abort', onAbort)
+        resolve(true)
+      }, ms)
+      abort.signal.addEventListener('abort', onAbort, { once: true })
+    })
   }
 
   // canUseTool is the single permission authority: the plan-approval gate for
@@ -330,6 +372,32 @@ export class AgentSession {
 
 function userMessage(text: string): unknown {
   return { type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null, session_id: '' }
+}
+
+/** Max automatic restarts for a transient PRE-init failure (then surface). */
+const MAX_STARTUP_RETRIES = 3
+
+/**
+ * Classify a run-loop failure: is it a transient infra blip (worth an automatic
+ * restart) and what should the user see? Turns a raw "401 Invalid authentication
+ * credentials" into an actionable message instead of a scary dead-end.
+ */
+function classifyError(err: unknown): { transient: boolean; message: string } {
+  const raw = err instanceof Error ? err.message : String(err)
+  const lower = raw.toLowerCase()
+  // Auth: usually a real expired login / bad key — don't auto-retry, but tell the
+  // user exactly what to do (this is the 401 dead-end we kept hitting).
+  if (/\b(401|403)\b|invalid authentication|unauthorized|authentication_error|permission_error/.test(lower)) {
+    return {
+      transient: false,
+      message: `Authentication failed — make sure Claude Code is logged in (run \`claude\` once in a terminal), or that your gateway/provider key is valid, then click Resume. [${raw}]`
+    }
+  }
+  // Transient: rate-limit / overloaded / 5xx / network — safe to restart a spawn.
+  if (/\b(429|500|502|503|504|529)\b|rate.?limit|overloaded|too many requests|timeout|etimedout|econnreset|econnrefused|enotfound|socket hang up|fetch failed|network error/.test(lower)) {
+    return { transient: true, message: `Transient error after retries — click Resume to continue. [${raw}]` }
+  }
+  return { transient: false, message: raw }
 }
 
 // Defensively pull token counts out of the SDK result's `usage` (untyped edge).

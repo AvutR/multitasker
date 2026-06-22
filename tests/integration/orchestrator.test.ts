@@ -309,6 +309,63 @@ describe('resume wakes the session — it runs only when the user steers', () =>
   })
 })
 
+describe('transient-error retry + classification', () => {
+  it('auto-retries a transient PRE-init failure (e.g. 503) with backoff, then succeeds', async () => {
+    const { repos, bus, actions } = deps()
+    let attempts = 0
+    h.queryImpl = () =>
+      (async function* () {
+        attempts++
+        if (attempts === 1) throw new Error('API Error: 503 overloaded_error')
+        yield { type: 'system', session_id: 'sdk-retry' }
+        yield { type: 'result', subtype: 'success', total_cost_usd: 0 }
+      })()
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+    session.start('do it')
+    await session.whenDone()
+    expect(attempts).toBe(2) // failed once, restarted, succeeded
+    expect(session.snapshot().status).toBe('completed')
+  }, 10_000)
+
+  it('does NOT auto-retry an auth failure; surfaces an actionable message', async () => {
+    const { repos, bus, actions } = deps()
+    let attempts = 0
+    h.queryImpl = () =>
+      (async function* () {
+        attempts++
+        throw new Error('API Error: 401 Invalid authentication credentials')
+        // eslint-disable-next-line no-unreachable
+        yield { type: 'result', subtype: 'success' }
+      })()
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+    session.start('do it')
+    await session.whenDone()
+    expect(attempts).toBe(1) // not retried
+    const snap = session.snapshot()
+    expect(snap.status).toBe('error')
+    expect(snap.error).toMatch(/Authentication failed/)
+  })
+
+  it('does NOT auto-retry a transient failure that occurs AFTER the session initialized', async () => {
+    const { repos, bus, actions } = deps()
+    let attempts = 0
+    h.queryImpl = () =>
+      (async function* () {
+        attempts++
+        yield { type: 'system', session_id: 'sdk-x' } // initializes → sdkSessionId set
+        throw new Error('API Error: 429 rate_limit_exceeded')
+      })()
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+    session.start('do it')
+    await session.whenDone()
+    expect(attempts).toBe(1) // mid-run failure is surfaced, not silently re-run
+    expect(session.snapshot().status).toBe('error')
+  })
+})
+
 describe('persistent workState + tracker link', () => {
   it('workState follows status, but a stop preserves the prior state; link round-trips', () => {
     const { repos } = deps()
@@ -628,6 +685,39 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     manager.stop(conductor.id)
     // The conductor's children are aborted too — none left running with no parent.
     expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('over-budget downshift tiers a delegated sub-agent one rung cheaper', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8, budgetUsd: 1, overBudgetMode: 'downshift', tieringStrategy: 'fixed', delegateModel: 'opus' })
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'go', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    repos.sessions.update(conductor.id, { totalCostUsd: 2 }) // push spend over the $1 budget
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    const child = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string }
+    // delegateModel is opus, but over budget → downshifted to sonnet.
+    expect(manager.list().find((s) => s.id === child.id)?.model).toBe('sonnet')
+  })
+
+  it('does not downshift when under budget or when the mode is off', async () => {
+    const { repos, bus, actions } = deps()
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    // Under budget (no spend) → no downshift even with mode on.
+    repos.settings.set({ concurrencyCap: 8, budgetUsd: 100, overBudgetMode: 'downshift', tieringStrategy: 'fixed', delegateModel: 'opus' })
+    const c1 = await manager.spawn({ prompt: 'go', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    const a = (await orch.delegate(c1.id, { title: 'A', prompt: 'do A' })) as { id: string }
+    expect(manager.list().find((s) => s.id === a.id)?.model).toBe('opus')
+
+    // Over budget but mode 'off' → passive (no downshift).
+    repos.settings.set({ budgetUsd: 1, overBudgetMode: 'off' })
+    repos.sessions.update(c1.id, { totalCostUsd: 5 })
+    const b = (await orch.delegate(c1.id, { title: 'B', prompt: 'do B' })) as { id: string }
+    expect(manager.list().find((s) => s.id === b.id)?.model).toBe('opus')
   })
 
   it('parentId round-trips through the session repo (migration 0004)', () => {
