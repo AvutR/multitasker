@@ -17,6 +17,8 @@ export interface Orchestration {
   listChildren: (parentId: string) => { id: string; title: string; status: string; summary: string }[]
   /** Block until the given sub-agents (or all of them) finish, then return their results. */
   waitForChildren: (parentId: string, childIds?: string[]) => Promise<{ id: string; title: string; status: string; summary: string }[]>
+  /** Pre-flight gate: present the decomposition for human approval before fan-out. */
+  proposePlan: (parentId: string, subtasks: { title: string; kind?: string }[]) => Promise<{ approved: boolean; feedback?: string }>
 }
 
 /**
@@ -59,6 +61,23 @@ export function createIntegrationMcpServer(actionService: ActionService, session
 
   const orchestrationTools = orchestration
     ? [
+        tool(
+          'propose_plan',
+          'BEFORE you delegate anything, present your decomposition for one-click human approval. Pass `subtasks` — the list of independent pieces you plan to fan out, each { title, kind? }. This BLOCKS until the human approves (then delegate exactly those) or rejects with feedback (then revise and call propose_plan again). Call this ONCE up front so the fan-out spend is approved, not assumed.',
+          {
+            subtasks: z
+              .array(z.object({ title: z.string(), kind: z.enum(['research', 'docs', 'implement', 'test', 'review', 'orchestrate']).optional() }))
+              .describe('The sub-tasks you plan to delegate')
+          },
+          async (args) => {
+            const decision = await orchestration.proposePlan(sessionId, args.subtasks)
+            return text(
+              decision.approved
+                ? 'Plan APPROVED — delegate exactly these sub-tasks now.'
+                : `Plan REJECTED — do NOT delegate. Revise per this feedback and call propose_plan again: ${decision.feedback ?? '(no feedback given)'}`
+            )
+          }
+        ),
         tool(
           'delegate_subtask',
           'Delegate ONE focused, independent piece of work to a parallel sub-agent in this same repo. Set `kind` to the type of work and the right cheap model is chosen for you (research/docs → Haiku, implement/test/review → Sonnet, orchestrate → Opus). Use this to fan out decomposed work — call it once per independent sub-task. Returns the sub-agent id.',

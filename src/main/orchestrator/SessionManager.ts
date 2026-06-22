@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { SessionInfo, SpawnRequest } from '@shared/types'
 import { idleSessionIds, isTerminalStatus } from '@shared/board'
-import { recommendModelForSubtask, tierForKind, TASK_KINDS } from '@shared/modelTier'
+import { classifySubtask, recommendModelForSubtask, tierForKind, TASK_KINDS } from '@shared/modelTier'
 import { buildTaskBrief } from '@shared/taskBrief'
 import { recall } from '../integrations/agentMemory'
 import { projectRoot } from '../util/projectRoot'
@@ -34,6 +34,18 @@ function downshiftTier(model: string): string {
   return model
 }
 
+/** Render a conductor's proposed decomposition as a plan the user can approve —
+ *  each sub-task with the model tier it would run on (so the cost is legible). */
+function formatDecomposition(subtasks: { title: string; kind?: string }[]): string {
+  if (!subtasks.length) return 'Proposed decomposition: (none)\n\nApprove to proceed, or reject with feedback.'
+  const lines = subtasks.map((t, i) => {
+    const kind = t.kind && (TASK_KINDS as string[]).includes(t.kind) ? (t.kind as (typeof TASK_KINDS)[number]) : classifySubtask(t.title)
+    const tier = kind ? tierForKind(kind) : 'sonnet'
+    return `${i + 1}. [${tier}] ${t.title}${t.kind ? ` · ${t.kind}` : ''}`
+  })
+  return `Proposed decomposition — ${subtasks.length} parallel sub-agent${subtasks.length === 1 ? '' : 's'}:\n\n${lines.join('\n')}\n\nApprove to fan out exactly these, or reject with feedback to revise.`
+}
+
 /**
  * Owns the live AgentSession pool. Enforces a concurrency cap: a live session
  * holds a Claude Code subprocess for its lifetime, so spawns over the cap are
@@ -61,7 +73,8 @@ export class SessionManager {
       orchestration: {
         delegate: (parentId, input) => this.delegate(parentId, input),
         listChildren: (parentId) => this.listChildren(parentId),
-        waitForChildren: (parentId, childIds) => this.waitForChildren(parentId, childIds)
+        waitForChildren: (parentId, childIds) => this.waitForChildren(parentId, childIds),
+        proposePlan: (parentId, subtasks) => this.proposePlan(parentId, subtasks)
       }
     }
   }
@@ -248,6 +261,15 @@ export class SessionManager {
   }
 
   // --- agentic orchestration (conductor → sub-agents) ----------------------
+
+  /** Conductor pre-flight gate: format the proposed decomposition (each sub-task
+   *  with its inferred model tier) and BLOCK on the user's one-click approval, so
+   *  the fan-out's spend is approved before any sub-agent spawns. */
+  private proposePlan(parentId: string, subtasks: { title: string; kind?: string }[]): Promise<{ approved: boolean; feedback?: string }> {
+    const session = this.sessions.get(parentId)
+    if (!session) return Promise.resolve({ approved: true }) // no live conductor → nothing to gate
+    return session.proposePlan(formatDecomposition(subtasks))
+  }
 
   /** Spawn a sub-agent for a conductor. The child runs on the cheaper delegate
    *  model, in the conductor's working directory (shared worktree), linked by

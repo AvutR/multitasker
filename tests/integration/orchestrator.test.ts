@@ -726,13 +726,16 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     const orchestration = {
       delegate: async () => ({ id: 'x', title: '', status: '' }),
       listChildren: () => [],
-      waitForChildren: async () => []
+      waitForChildren: async () => [],
+      proposePlan: async () => ({ approved: true })
     }
     const withOrch = createIntegrationMcpServer(actions, 's1', { orchestration, memoryRoot: '/tmp' }) as unknown as { tools: { name: string }[] }
     const childServer = createIntegrationMcpServer(actions, 's2', { orchestration: undefined, memoryRoot: '/tmp' }) as unknown as { tools: { name: string }[] }
     expect(withOrch.tools.some((t) => t.name === 'delegate_subtask')).toBe(true)
-    // A child gets NO delegate capability → a fan-out can't recurse (25^depth).
+    expect(withOrch.tools.some((t) => t.name === 'propose_plan')).toBe(true) // pre-flight gate present
+    // A child gets NO delegate/propose capability → a fan-out can't recurse (25^depth).
     expect(childServer.tools.some((t) => t.name === 'delegate_subtask')).toBe(false)
+    expect(childServer.tools.some((t) => t.name === 'propose_plan')).toBe(false)
     expect(childServer.tools.some((t) => t.name === 'remember')).toBe(true) // memory tools still present
   })
 
@@ -761,6 +764,27 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
 
     const child = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string }
     expect(manager.list().find((s) => s.id === child.id)?.permissionMode).toBe('plan')
+  })
+
+  it('proposePlan gates the fan-out: emits a plan request, blocks, resolves on the user’s decision', async () => {
+    const { repos, bus, actions, events } = deps()
+    const info = makeInfo(repos)
+    const session = new AgentSession({ repos, bus, actions }, info, { systemPromptAppend: '', isBuildPipeline: false })
+
+    let decided: { approved: boolean; feedback?: string } | null = null
+    const p = session.proposePlan('1. [haiku] research X\n2. [sonnet] implement Y').then((d) => {
+      decided = d
+      return d
+    })
+    await vi.waitFor(() => expect(session.snapshot().status).toBe('awaiting_plan_approval'))
+    expect(events.some((e) => e.channel === 'session:planRequest' && (e.payload as { sessionId: string }).sessionId === info.id)).toBe(true)
+    expect(decided).toBeNull() // still blocking — no fan-out yet
+
+    session.approvePlan(false, 'drop task 2')
+    const r = await p
+    expect(r.approved).toBe(false)
+    expect(r.feedback).toBe('drop task 2') // rejection feedback flows back to the conductor
+    expect(session.snapshot().status).toBe('running') // gate released
   })
 
   it('parentId round-trips through the session repo (migration 0004)', () => {

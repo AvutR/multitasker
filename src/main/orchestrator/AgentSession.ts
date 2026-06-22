@@ -265,19 +265,7 @@ export class AgentSession {
   private canUseTool = async (toolName: string, input: Record<string, unknown>) => {
     if (isExitPlanTool(toolName)) {
       const plan = typeof input?.plan === 'string' ? input.plan : ''
-      this.patch({ status: 'awaiting_plan_approval' })
-      this.deps.bus.emit({
-        channel: 'session:planRequest',
-        payload: { sessionId: this.info.id, plan, requestedAt: Date.now() }
-      })
-      const decision = await new Promise<PlanDecision>((resolve) => {
-        this.planResolver = resolve
-        // If the session is stopped while awaiting approval, resolve as a denial
-        // so this turn ends instead of hanging forever.
-        if (this.abort.signal.aborted) resolve({ approved: false })
-        else this.abort.signal.addEventListener('abort', () => resolve({ approved: false }), { once: true })
-      })
-      this.patch({ status: 'running' })
+      const decision = await this.requestPlanApproval(plan)
       if (decision.approved) return { behavior: 'allow', updatedInput: input }
       return {
         behavior: 'deny',
@@ -288,6 +276,31 @@ export class AgentSession {
     const decision = await this.gate(toolName, input)
     if (decision.allow) return { behavior: 'allow', updatedInput: input }
     return { behavior: 'deny', message: decision.message ?? 'Blocked by Multitasker policy' }
+  }
+
+  /** Emit a plan-approval request and BLOCK until the user decides (or the session
+   *  is stopped → denial). Shared by the ExitPlanMode gate and the conductor's
+   *  propose_plan pre-flight gate; patches status around the wait. */
+  private requestPlanApproval(plan: string): Promise<PlanDecision> {
+    this.patch({ status: 'awaiting_plan_approval' })
+    this.deps.bus.emit({
+      channel: 'session:planRequest',
+      payload: { sessionId: this.info.id, plan, requestedAt: Date.now() }
+    })
+    return new Promise<PlanDecision>((resolve) => {
+      this.planResolver = resolve
+      if (this.abort.signal.aborted) resolve({ approved: false })
+      else this.abort.signal.addEventListener('abort', () => resolve({ approved: false }), { once: true })
+    }).then((decision) => {
+      this.patch({ status: 'running' })
+      return decision
+    })
+  }
+
+  /** Conductor pre-flight gate: present the decomposition for human approval
+   *  BEFORE any sub-agent spawns, so the fan-out's spend is approved, not trusted. */
+  proposePlan(plan: string): Promise<PlanDecision> {
+    return this.requestPlanApproval(plan)
   }
 
   // --- message routing -----------------------------------------------------
