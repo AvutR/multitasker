@@ -22,6 +22,9 @@ export interface SessionDeps {
 export interface SessionLaunchOptions {
   systemPromptAppend: string
   isBuildPipeline: boolean
+  /** A delegated sub-agent: runs ONE task then terminates (never steered), so it
+   *  frees its slot and reaches a terminal status the conductor's wait can see. */
+  singleShot?: boolean
 }
 
 interface PlanDecision {
@@ -292,6 +295,11 @@ export class AgentSession {
           outputTokens: output ?? this.info.outputTokens,
           status
         })
+        // A single-shot sub-agent finished its one task — close its input so the
+        // run loop ends and it reaches a terminal `completed` status. Otherwise it
+        // parks here in awaiting_input holding a slot, and the conductor's
+        // wait_for_subtasks never sees it finish (hangs to the 15-min timeout).
+        if (this.launch.singleShot) this.queue.close()
         break
       }
       default:

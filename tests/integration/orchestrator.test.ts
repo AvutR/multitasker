@@ -551,6 +551,85 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     expect(results).toHaveLength(2)
   })
 
+  it('waitForChildren releases the conductor’s slot so a queued child can run (deadlock fix)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 1 }) // exactly one slot — the conductor holds it
+    // Call 0 = the conductor (parks until aborted, holding the only slot).
+    // Call 1 = the child (runs one turn and ends → completed).
+    let calls = 0
+    h.queryImpl = (args) => {
+      const n = calls++
+      return (async function* () {
+        yield { type: 'system', session_id: randomUUID() }
+        if (n === 0) {
+          await new Promise<void>((res) => {
+            const sig = (args.options.abortController as AbortController | undefined)?.signal
+            if (!sig || sig.aborted) res()
+            else sig.addEventListener('abort', () => res(), { once: true })
+          })
+        } else {
+          yield { type: 'result', subtype: 'success', total_cost_usd: 0 }
+        }
+      })()
+    }
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'orchestrate', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === conductor.id)?.status).toBe('running'))
+
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function; waitForChildren: Function } } }).deps.orchestration
+    const child = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string }
+    // Cap is full (conductor holds the only slot), so the child is queued.
+    expect(manager.list().find((s) => s.id === child.id)?.status).toBe('queued')
+
+    // The conductor waits on the child. WITHOUT the slot-release this deadlocks —
+    // the child can never get a slot — and only the 15-min timeout would escape.
+    // WITH the fix the conductor yields its slot, the child runs and completes.
+    const results = (await orch.waitForChildren(conductor.id, [child.id])) as { id: string; status: string }[]
+    expect(results.find((c) => c.id === child.id)?.status).toBe('completed')
+  })
+
+  it('a delegated sub-agent is single-shot: it terminates after one result (no awaiting_input park)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8 })
+    // A realistic sub-agent stream: consume the prompt, emit a result, then wait
+    // for more input. It only ENDS if its input is closed — which single-shot does.
+    h.queryImpl = (args) =>
+      (async function* () {
+        const it = (args.prompt as AsyncIterable<unknown>)[Symbol.asyncIterator]()
+        await it.next() // the delegated prompt
+        yield { type: 'system', session_id: randomUUID() }
+        yield { type: 'result', subtype: 'success', total_cost_usd: 0 }
+        await it.next() // resolves done only once single-shot closes the queue
+      })()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = makeInfo(repos, { id: randomUUID() })
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+    const child = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string }
+    // Single-shot closes the input on result → the child reaches `completed`
+    // (terminal), instead of parking forever in awaiting_input holding its slot.
+    await vi.waitFor(() => expect(manager.list().find((s) => s.id === child.id)?.status).toBe('completed'))
+  })
+
+  it('stopping a conductor cascades stop to its sub-agents (no orphaned spend)', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8 })
+    // Hermetic: noop streams (no long-lived parked child, which intermittently
+    // leaks the real SDK). We assert the cascade WIRING — stop(parent) calls each
+    // live child's stop() — directly via a spy, independent of SDK run state.
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'orchestrate', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+    const child = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A' })) as { id: string }
+
+    const childSession = (manager as unknown as { sessions: Map<string, { stop: () => void }> }).sessions.get(child.id)!
+    const stopSpy = vi.spyOn(childSession, 'stop')
+
+    manager.stop(conductor.id)
+    // The conductor's children are aborted too — none left running with no parent.
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
   it('parentId round-trips through the session repo (migration 0004)', () => {
     const { repos } = deps()
     const info = makeInfo(repos, { parentId: 'conductor-123' })

@@ -36,6 +36,19 @@ describe('modelTier — auto-select a model for a delegated sub-task', () => {
     expect(classifySubtask('review the implementation')).toBe('review')
   })
 
+  it('on mixed exploration+mutation verbs, biases to the CAPABLE tier (no cheap-bias)', () => {
+    // These used to mis-route to Haiku because the research rule matched first.
+    expect(recommendModelForSubtask('find and fix the N+1 query')).toBe('sonnet')
+    expect(recommendModelForSubtask('investigate why the build is broken and repair it')).toBe('sonnet')
+    expect(recommendModelForSubtask('search the code then implement the fix')).toBe('sonnet')
+    expect(recommendModelForSubtask('summarize the architecture and propose a refactor')).toBe('sonnet')
+    expect(recommendModelForSubtask('debug and patch the race condition')).toBe('sonnet')
+    // Pure exploration (no mutation verb) still routes cheap.
+    expect(recommendModelForSubtask('find where the auth middleware lives')).toBe('haiku')
+    // An orchestration verb still wins over everything (strongest tier).
+    expect(recommendModelForSubtask('decompose the epic and implement the first slice')).toBe('opus')
+  })
+
   it('tierForKind maps a conductor-judged kind to the right tier (LLM-as-judge)', () => {
     expect(tierForKind('research')).toBe('haiku')
     expect(tierForKind('docs')).toBe('haiku')

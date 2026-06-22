@@ -161,7 +161,11 @@ export class SessionManager {
 
     const session = new AgentSession(this.deps, info, {
       systemPromptAppend,
-      isBuildPipeline: Boolean(preset.isBuildPipeline)
+      isBuildPipeline: Boolean(preset.isBuildPipeline),
+      // A delegated sub-agent (parentId set; only delegate() spawns with one) is a
+      // single-shot worker: one task, then terminate. Frees its slot promptly and
+      // lets the conductor's wait_for_subtasks observe a real terminal status.
+      singleShot: Boolean(req.parentId)
     })
     this.sessions.set(id, session)
     this.automation.register(id, {
@@ -193,7 +197,19 @@ export class SessionManager {
   }
 
   stop(id: string): void {
+    this.stopChildren(id)
     this.sessions.get(id)?.stop()
+  }
+
+  /** Abort a conductor's live sub-agents (recursively) so ending a conductor
+   *  doesn't leave orphaned children spending with no one to synthesize them. */
+  private stopChildren(parentId: string): void {
+    for (const child of this.sessions.values()) {
+      if (child.snapshot().parentId === parentId) {
+        this.stopChildren(child.id) // grandchildren first
+        child.stop()
+      }
+    }
   }
 
   markLanded(id: string): void {
@@ -203,6 +219,7 @@ export class SessionManager {
   /** Mark a session's work done: stop its subprocess (freeing its slot) and move
    *  it to the Done lane. Works whether the session is live or already stopped. */
   markDone(id: string): void {
+    this.stopChildren(id) // the workstream is done — end its sub-agents too
     const live = this.sessions.get(id)
     if (live) {
       live.markDone()
@@ -275,12 +292,33 @@ export class SessionManager {
 
     if (targets.length === 0 || allDone()) return Promise.resolve(result())
 
+    // The conductor is parked here holding a concurrency slot. Release it for the
+    // duration of the wait so its (possibly queued) children can actually start —
+    // otherwise a fan-out wider than the free slots DEADLOCKS until the timeout
+    // (the conductor holds a slot waiting for children that can't get a slot).
+    // Re-acquire on finish so the conductor's own slot is still counted exactly
+    // once (its whenDone() does the final decrement when it ultimately ends).
+    // Guard on `sessions.has`: a live conductor (always true when called via the
+    // MCP tool) holds a counted slot; a direct/test call on a bare row does not.
+    const holdsSlot = this.sessions.has(parentId)
+    if (holdsSlot) {
+      this.active -= 1
+      this.pump()
+    }
+
     return new Promise((resolve) => {
       let unsub: (() => void) | null = null
       let timer: ReturnType<typeof setTimeout> | null = null
+      let settled = false
       const finish = () => {
+        if (settled) return // guard: re-acquire the slot exactly once
+        settled = true
         unsub?.()
         if (timer) clearTimeout(timer)
+        if (holdsSlot) {
+          this.active += 1
+          this.pump()
+        }
         resolve(result())
       }
       unsub = this.bus.onEvent((e) => {
@@ -299,7 +337,9 @@ export class SessionManager {
         .map((b) => (b.type === 'text' ? b.text : ''))
         .join(' ')
         .trim()
-      if (text) return text.length > 280 ? `${text.slice(0, 280)}…` : text
+      // Hand the conductor enough of each sub-agent's conclusion to synthesize
+      // WITHOUT re-delegating for lack of signal; 280 chars truncated real work.
+      if (text) return text.length > 1200 ? `${text.slice(0, 1200)}…` : text
     }
     return ''
   }
@@ -307,6 +347,7 @@ export class SessionManager {
   /** Remove a session entirely: stop its subprocess, free its slot, and
    *  hard-delete its row, transcript, and audit entries. */
   delete(id: string): void {
+    this.stopChildren(id) // don't leave sub-agents running once the parent is gone
     const session = this.sessions.get(id)
     if (session) {
       session.dispose() // aborts the run loop; whenDone() then frees the active slot
