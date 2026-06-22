@@ -3,6 +3,7 @@ import { openDatabase } from '../../src/main/db/database'
 import { createRepositories, type Repositories } from '../../src/main/db/repositories'
 import { EventBus } from '../../src/main/events'
 import { ActionService, seedDefaultPolicies } from '../../src/main/integrations/ActionService'
+import { createConnectorGate } from '../../src/main/integrations/guards'
 import type {
   ConnectorExecuteInput,
   ConnectorExecuteResult,
@@ -139,6 +140,28 @@ describe('audit log', () => {
     await svc.propose({ ...base, actionType: 'slack.message' }) // pending
     await svc.guard({ ...base, actionType: 'slack.message' }) // pending (raw)
     expect(svc.list()).toHaveLength(3)
+  })
+})
+
+describe('createConnectorGate — audit redaction (path #2)', () => {
+  it('scrubs secrets from the persisted raw payload (the agent still runs with real values)', async () => {
+    const { svc } = setup(false)
+    const gate = createConnectorGate(svc, 's1')
+    const decision = await gate('mcp__slack__slack_send_message', {
+      channel: '#eng',
+      text: 'token is sk-ABCDEF0123456789ABCDEF',
+      authorization: 'Bearer super-secret-token-value',
+      headers: { Cookie: 'session=abc' }
+    })
+    expect(decision.allow).toBe(false) // slack.message defaults to APPROVE → gated (audited)
+
+    const rec = svc.list().find((a) => a.actionType === 'slack.message')!
+    const payload = rec.payload as Record<string, unknown>
+    expect(payload.authorization).toBe('[REDACTED]') // sensitive KEY → value redacted
+    expect((payload.headers as Record<string, unknown>).Cookie).toBe('[REDACTED]') // nested key
+    expect(String(payload.text)).toContain('[REDACTED]') // inline sk- secret scrubbed
+    expect(String(payload.text)).not.toContain('sk-ABCDEF')
+    expect(payload.channel).toBe('#eng') // non-secret data preserved
   })
 })
 

@@ -52,6 +52,25 @@ describe('classifyRawTool — default-deny connector guard (path #2)', () => {
     )
   })
 
+  it('gates a raw `git push` via Bash (the gh check alone missed it)', () => {
+    expect(classifyRawTool('Bash', { command: 'git push origin my-branch' })?.actionType).toBe('github.push_branch')
+    expect(classifyRawTool('Bash', { command: 'git   push -u origin HEAD' })?.actionType).toBe('github.push_branch')
+    expect(classifyRawTool('Bash', { command: 'git commit -m wip' })).toBeNull() // local-only, not gated
+  })
+
+  it('classifies by action VERB, not noun — a write can’t smuggle through on a read-ish noun', () => {
+    // These carry a read-ish NOUN (documents/members/comments/labels) but a WRITE
+    // verb — previously they slipped through as "reads"; now they're gated.
+    expect(classifyRawTool('mcp__notion__notion-update-documents')?.actionType).toBe('notion.page_update')
+    expect(classifyRawTool('mcp__slack__slack_update_members')?.actionType).toBe('slack.message')
+    expect(classifyRawTool('mcp__linear__create_comment')?.actionType).toBe('linear.comment')
+    expect(classifyRawTool('mcp__linear__archive_project')?.actionType).toBe('linear.issue_update')
+    // Genuine reads with those nouns still pass (read verb, no write verb).
+    expect(classifyRawTool('mcp__linear__list_comments')).toBeNull()
+    expect(classifyRawTool('mcp__notion__notion-get-documents')).toBeNull()
+    expect(classifyRawTool('mcp__slack__slack_list_channel_members')).toBeNull()
+  })
+
   it('never gates our own semantic integration tools (handled by path #1)', () => {
     expect(classifyRawTool('mcp__multitasker-integrations__update_linear_status')).toBeNull()
     expect(classifyRawTool('mcp__multitasker-integrations__post_standup')).toBeNull()

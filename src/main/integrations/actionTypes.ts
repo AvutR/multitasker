@@ -126,18 +126,23 @@ export interface RawToolClassification {
   def: ActionTypeDef
 }
 
-// Read-ish verbs: a connector tool whose name contains one of these tokens is
-// treated as non-mutating and passes through ungated. Everything else in a
-// connector namespace is gated (default-deny) so new/renamed writes fail safe.
-// Tokenized on non-letters because tool names are snake/kebab (\b breaks on '_').
-const READ_VERBS = new Set([
-  'search', 'read', 'list', 'get', 'fetch', 'view', 'history', 'profile', 'info',
-  'reactions', 'members', 'comments', 'documents', 'cycles', 'labels', 'statuses',
-  'users', 'teams', 'projects', 'milestones', 'initiatives', 'diff', 'diffs'
+// Read vs write is decided by the ACTION VERB in the tool name, not by nouns.
+// A tool is a read iff it carries a read verb AND no write verb; everything else
+// in a connector namespace is gated (default-deny) so new/renamed writes fail
+// safe. Verb-based (not noun-based) so a write like `update_documents` or
+// `create_comment` can't smuggle through on a read-ish noun (`documents`,
+// `comments`). Tokenized on non-letters because tool names are snake/kebab.
+const READ_VERBS = new Set(['search', 'read', 'list', 'get', 'fetch', 'view', 'query', 'retrieve', 'history'])
+const WRITE_VERBS = new Set([
+  'create', 'update', 'save', 'send', 'post', 'delete', 'remove', 'add', 'set',
+  'archive', 'unarchive', 'move', 'duplicate', 'merge', 'close', 'reopen',
+  'rename', 'edit', 'upload', 'assign', 'write', 'push', 'modify', 'mutate', 'schedule'
 ])
 
 function isReadTool(name: string): boolean {
-  return name.split(/[^a-z]+/).some((tok) => READ_VERBS.has(tok))
+  const toks = name.split(/[^a-z]+/)
+  if (toks.some((tok) => WRITE_VERBS.has(tok))) return false // any write verb → gated
+  return toks.some((tok) => READ_VERBS.has(tok))
 }
 
 /**
@@ -157,8 +162,13 @@ export function classifyRawTool(
   if (n.includes('multitasker')) return null
 
   // Bash/shell can reach connectors out-of-band; inspect the command string.
+  // (Best-effort — an arbitrary shell can't be fully enumerated; the real
+  // boundary is permissionMode. We gate the high-value, concrete cases.)
   if (n === 'bash' || n === 'shell' || n.endsWith('__bash')) {
     const cmd = String(toolInput?.command ?? '').toLowerCase()
+    // `git push` is a real outward action with its own policy type, but the gh
+    // check below misses it (no `gh` token) — gate it explicitly.
+    if (/\bgit\s+push\b/.test(cmd)) return pick('github.push_branch')
     if (/\bgh\b/.test(cmd)) return pick('github.pr_create')
     if (/\b(curl|wget|https?)\b/.test(cmd)) {
       if (cmd.includes('slack')) return pick('slack.message')
