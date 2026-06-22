@@ -337,7 +337,7 @@ export class AgentSession {
         const cost = typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : this.info.totalCostUsd
         const turns = typeof msg.num_turns === 'number' ? msg.num_turns : this.info.numTurns
         const subtype = typeof msg.subtype === 'string' ? msg.subtype : 'success'
-        const { input, output } = extractTokens(msg.usage)
+        const { input, output, cacheRead } = extractTokens(msg.usage)
         this.persist('result', [{ type: 'text', text: resultText(subtype, msg.result) }], {
           resultSubtype: subtype,
           costUsd: cost
@@ -348,6 +348,7 @@ export class AgentSession {
           numTurns: turns,
           inputTokens: input ?? this.info.inputTokens,
           outputTokens: output ?? this.info.outputTokens,
+          cachedInputTokens: cacheRead ?? this.info.cachedInputTokens,
           status
         })
         // A single-shot sub-agent finished its one task — close its input so the
@@ -415,13 +416,14 @@ function classifyError(err: unknown): { transient: boolean; message: string } {
 
 // Defensively pull token counts out of the SDK result's `usage` (untyped edge).
 // Input includes cache read/creation tokens — those are real billed input.
-function extractTokens(usage: unknown): { input: number | null; output: number | null } {
-  if (!usage || typeof usage !== 'object') return { input: null, output: null }
+function extractTokens(usage: unknown): { input: number | null; output: number | null; cacheRead: number | null } {
+  if (!usage || typeof usage !== 'object') return { input: null, output: null, cacheRead: null }
   const u = usage as Record<string, unknown>
   const num = (v: unknown) => (typeof v === 'number' ? v : 0)
-  const input = num(u.input_tokens) + num(u.cache_read_input_tokens) + num(u.cache_creation_input_tokens)
+  const cacheRead = num(u.cache_read_input_tokens)
+  const input = num(u.input_tokens) + cacheRead + num(u.cache_creation_input_tokens)
   const output = num(u.output_tokens)
-  return { input: input || null, output: output || null }
+  return { input: input || null, output: output || null, cacheRead: cacheRead || null }
 }
 
 function resultText(subtype: string, result: unknown): string {

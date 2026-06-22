@@ -42,6 +42,9 @@ export interface SessionInfo {
   /** Token usage for the session (input incl. cache, and output), when the SDK reports it. */
   inputTokens?: number
   outputTokens?: number
+  /** Of inputTokens, the portion served from the prompt cache (cache_read) — for the
+   *  observatory's cache hit-rate, so prompt-cache effectiveness is visible. */
+  cachedInputTokens?: number
   createdAt: number
   updatedAt: number
   error: string | null

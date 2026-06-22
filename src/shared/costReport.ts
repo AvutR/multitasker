@@ -27,6 +27,9 @@ export interface CostReport {
   sessionCount: number
   inputTokens: number
   outputTokens: number
+  /** Of the input tokens, how many were served from the prompt cache (~0.1× cost).
+   *  A high share means the stable system/skills prefix is being reused, not re-billed. */
+  cachedInputTokens: number
   byModel: CostBucket[] // cost desc
   byWorkflow: CostBucket[] // cost desc
   top: TopSession[] // priciest sessions, cost desc
@@ -53,6 +56,7 @@ export function buildCostReport(sessions: SessionInfo[], budgetUsd?: number | nu
   const totalUsd = sessions.reduce((sum, s) => sum + s.totalCostUsd, 0)
   const inputTokens = sessions.reduce((sum, s) => sum + (s.inputTokens ?? 0), 0)
   const outputTokens = sessions.reduce((sum, s) => sum + (s.outputTokens ?? 0), 0)
+  const cachedInputTokens = sessions.reduce((sum, s) => sum + (s.cachedInputTokens ?? 0), 0)
 
   const top = [...sessions]
     .filter((s) => s.totalCostUsd > 0)
@@ -66,6 +70,7 @@ export function buildCostReport(sessions: SessionInfo[], budgetUsd?: number | nu
     sessionCount: sessions.length,
     inputTokens,
     outputTokens,
+    cachedInputTokens,
     byModel: bucketize(sessions, (s) => s.model ?? 'unknown'),
     byWorkflow: bucketize(sessions, (s) => s.presetId ?? 'unknown'),
     top,

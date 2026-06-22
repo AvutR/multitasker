@@ -44,6 +44,7 @@ interface SessionRow {
   output_tokens: number
   task_brief: string | null
   review_verdict: string | null
+  cached_input_tokens: number
 }
 
 interface MessageRow {
@@ -100,7 +101,8 @@ function toSession(r: SessionRow): SessionInfo {
     inputTokens: r.input_tokens,
     outputTokens: r.output_tokens,
     taskBrief: r.task_brief,
-    reviewVerdict: (r.review_verdict as SessionInfo['reviewVerdict']) ?? null
+    reviewVerdict: (r.review_verdict as SessionInfo['reviewVerdict']) ?? null,
+    cachedInputTokens: r.cached_input_tokens
   }
 }
 
@@ -118,7 +120,8 @@ function bindSession(s: SessionInfo): Record<string, unknown> {
     inputTokens: s.inputTokens ?? 0,
     outputTokens: s.outputTokens ?? 0,
     taskBrief: s.taskBrief ?? null,
-    reviewVerdict: s.reviewVerdict ?? null
+    reviewVerdict: s.reviewVerdict ?? null,
+    cachedInputTokens: s.cachedInputTokens ?? 0
   }
 }
 
@@ -162,10 +165,10 @@ export class SessionRepo {
       .prepare(
         `INSERT INTO sessions (id, sdk_session_id, title, model, cwd, repo_id, branch, worktree_path,
            status, permission_mode, preset_id, total_cost_usd, num_turns, created_at, updated_at, error,
-           pinned, work_state, linear_issue_id, notion_page_id, parent_id, input_tokens, output_tokens, task_brief, review_verdict)
+           pinned, work_state, linear_issue_id, notion_page_id, parent_id, input_tokens, output_tokens, task_brief, review_verdict, cached_input_tokens)
          VALUES (@id, @sdkSessionId, @title, @model, @cwd, @repoId, @branch, @worktreePath,
            @status, @permissionMode, @presetId, @totalCostUsd, @numTurns, @createdAt, @updatedAt, @error,
-           @pinned, @workState, @linearIssueId, @notionPageId, @parentId, @inputTokens, @outputTokens, @taskBrief, @reviewVerdict)`
+           @pinned, @workState, @linearIssueId, @notionPageId, @parentId, @inputTokens, @outputTokens, @taskBrief, @reviewVerdict, @cachedInputTokens)`
       )
       .run(bindSession(s))
   }
@@ -187,7 +190,8 @@ export class SessionRepo {
            permission_mode=@permissionMode, preset_id=@presetId, total_cost_usd=@totalCostUsd,
            num_turns=@numTurns, updated_at=@updatedAt, error=@error,
            work_state=@workState, linear_issue_id=@linearIssueId, notion_page_id=@notionPageId,
-           parent_id=@parentId, input_tokens=@inputTokens, output_tokens=@outputTokens, review_verdict=@reviewVerdict
+           parent_id=@parentId, input_tokens=@inputTokens, output_tokens=@outputTokens, review_verdict=@reviewVerdict,
+           cached_input_tokens=@cachedInputTokens
          WHERE id=@id`
       )
       .run(bindSession(next))

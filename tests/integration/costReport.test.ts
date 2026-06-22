@@ -27,6 +27,15 @@ describe('buildCostReport', () => {
     expect(r.outputTokens).toBe(350)
   })
 
+  it('aggregates cached input tokens (for the prompt-cache hit-rate)', () => {
+    const r = buildCostReport([
+      session({ inputTokens: 1000, cachedInputTokens: 800 }),
+      session({ inputTokens: 500, cachedInputTokens: 100 })
+    ])
+    expect(r.inputTokens).toBe(1500)
+    expect(r.cachedInputTokens).toBe(900) // → 60% cache hit-rate in the observatory
+  })
+
   it('buckets by model, cost desc', () => {
     const r = buildCostReport(sessions)
     expect(r.byModel.map((b) => b.key)).toEqual(['opus', 'sonnet', 'haiku']) // 5, 3, 0

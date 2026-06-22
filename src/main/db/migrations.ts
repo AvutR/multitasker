@@ -108,5 +108,9 @@ export const MIGRATIONS: Migration[] = [
   {
     name: '0007_session_review_verdict',
     sql: `ALTER TABLE sessions ADD COLUMN review_verdict TEXT;`
+  },
+  {
+    name: '0008_session_cached_input_tokens',
+    sql: `ALTER TABLE sessions ADD COLUMN cached_input_tokens INTEGER NOT NULL DEFAULT 0;`
   }
 ]

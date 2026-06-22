@@ -53,6 +53,12 @@ export function CostObservatory({ onClose }: { onClose: () => void }) {
               <div className="text-[11px] uppercase tracking-wide text-[#6b7280]">Sessions</div>
               <div className="text-sm tabular-nums text-[#c7cdd8]">{report.sessionCount}</div>
             </div>
+            <div title="Share of input tokens served from the prompt cache (~0.1× cost). Higher = the stable system/skills prefix is being reused across turns, not re-billed. ~0% across long sessions would mean caching isn't kicking in.">
+              <div className="text-[11px] uppercase tracking-wide text-[#6b7280]">Cache hit-rate</div>
+              <div className="text-sm tabular-nums text-[#c7cdd8]">
+                {report.inputTokens > 0 ? `${Math.round((report.cachedInputTokens / report.inputTokens) * 100)}%` : '—'}
+              </div>
+            </div>
           </div>
 
           {/* Budget guardrail */}
