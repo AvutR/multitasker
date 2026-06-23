@@ -37,6 +37,8 @@ export interface SessionInfo {
   status: SessionStatus
   permissionMode: PermissionMode
   presetId: string | null
+  /** The AI engine backing this session: 'claude' (Agent SDK) or a CLI tool. */
+  engine?: string
   totalCostUsd: number
   numTurns: number
   /** Token usage for the session (input incl. cache, and output), when the SDK reports it. */
@@ -208,6 +210,8 @@ export interface SpawnRequest {
   cwd: string
   /** Preset id, or 'auto' / omitted to route by task intent (no slash command). */
   presetId?: string
+  /** Which AI coding tool backs the session (see shared/engines.ts). Default 'claude'. */
+  engine?: string
   model?: string
   permissionMode?: PermissionMode
   useWorktree?: boolean

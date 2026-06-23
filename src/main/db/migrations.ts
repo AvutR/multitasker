@@ -112,5 +112,9 @@ export const MIGRATIONS: Migration[] = [
   {
     name: '0008_session_cached_input_tokens',
     sql: `ALTER TABLE sessions ADD COLUMN cached_input_tokens INTEGER NOT NULL DEFAULT 0;`
+  },
+  {
+    name: '0009_session_engine',
+    sql: `ALTER TABLE sessions ADD COLUMN engine TEXT;`
   }
 ]

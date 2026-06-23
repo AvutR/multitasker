@@ -13,11 +13,15 @@ import type { ActionService } from '../integrations/ActionService'
 import { computeDiff, type WorktreeManager } from '../git/Worktrees'
 import { DEFAULT_PRESET_ID, getPreset, launchOptionsFor } from '../skills/launchPresets'
 import { resolvePresetId } from '../skills/taskRouter'
-import { AgentSession, type SessionDeps } from './AgentSession'
+import { AgentSession, type SessionDeps, type SessionLaunchOptions } from './AgentSession'
+import { CliSessionRunner } from './CliSessionRunner'
+import type { SessionRunner } from './SessionRunner'
+import { engineBinPath } from '../engines'
+import type { EngineId } from '@shared/engines'
 import type { LifecycleAutomation } from './LifecycleAutomation'
 
 interface PendingSpawn {
-  session: AgentSession
+  session: SessionRunner
   prompt: string
   kind: 'start' | 'resume' | 'fork'
 }
@@ -53,7 +57,7 @@ function formatDecomposition(subtasks: { title: string; kind?: string }[]): stri
  * queued and started as slots free up (when a session stops/ends/errors).
  */
 export class SessionManager {
-  private readonly sessions = new Map<string, AgentSession>()
+  private readonly sessions = new Map<string, SessionRunner>()
   private readonly pending: PendingSpawn[] = []
   private active = 0
   private readonly deps: SessionDeps
@@ -113,7 +117,10 @@ export class SessionManager {
     const preset = getPreset(resolvePresetId(req.presetId, req.prompt)) ?? getPreset(DEFAULT_PRESET_ID)!
     const settings = this.repos.settings.get()
     const id = randomUUID()
-    const useWorktree = req.useWorktree ?? preset.useWorktree
+    const engine = req.engine ?? 'claude'
+    // CLI engines aren't policy-intercepted on their own tool calls, so isolate
+    // them in a worktree by default (their edits stay contained + reviewable).
+    const useWorktree = req.useWorktree ?? (engine !== 'claude' ? true : preset.useWorktree)
     const repo = this.repos.repos.getByPath(req.cwd)
 
     let cwd = req.cwd
@@ -164,6 +171,7 @@ export class SessionManager {
       id,
       sdkSessionId: null,
       title,
+      engine,
       model: req.model ?? settings.defaultModel,
       cwd,
       repoId: repo?.id ?? null,
@@ -191,7 +199,7 @@ export class SessionManager {
     // can't recurse into a 25^depth session explosion (the per-parent
     // MAX_DELEGATIONS only bounds one level).
     const deps = req.parentId ? { ...this.deps, orchestration: undefined } : this.deps
-    const session = new AgentSession(deps, info, {
+    const session = this.makeRunner(deps, info, {
       systemPromptAppend,
       isBuildPipeline: Boolean(preset.isBuildPipeline),
       // A delegated sub-agent (parentId set; only delegate() spawns with one) is a
@@ -481,10 +489,21 @@ export class SessionManager {
     }
     this.repos.sessions.insert(info)
     this.bus.emit({ channel: 'session:updated', payload: info })
-    const session = new AgentSession(this.deps, info, launchOptionsFor(info.presetId))
+    const session = this.makeRunner(this.deps, info, launchOptionsFor(info.presetId))
     this.sessions.set(newId, session)
     this.enqueue({ session, prompt: '', kind: 'fork' })
     return session.snapshot()
+  }
+
+  /** Pick the engine implementation for a session: the Claude Agent SDK
+   *  (AgentSession — full policy/plan gating + integration tools) or a spawned
+   *  CLI coding tool (CliSessionRunner — Cursor, Codex, …). */
+  private makeRunner(deps: SessionDeps, info: SessionInfo, launch: SessionLaunchOptions): SessionRunner {
+    const engine = (info.engine ?? 'claude') as EngineId
+    if (engine === 'claude') return new AgentSession(deps, info, launch)
+    const binPath = engineBinPath(engine)
+    if (!binPath) throw new Error(`Engine "${engine}" is not installed (no binary found on PATH).`)
+    return new CliSessionRunner({ repos: deps.repos, bus: deps.bus }, info, engine, binPath)
   }
 
   // --- concurrency cap -----------------------------------------------------

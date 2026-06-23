@@ -10,6 +10,7 @@ import { claudeExecutablePath } from '../sdkRuntime'
 import { projectRoot } from '../util/projectRoot'
 import { AsyncQueue } from '../util/AsyncQueue'
 import { assistantBlocks, extractDelta, isExitPlanTool, userBlocks } from './sdkMapping'
+import type { PlanDecision, SessionRunner } from './SessionRunner'
 
 export interface SessionDeps {
   repos: Repositories
@@ -27,19 +28,15 @@ export interface SessionLaunchOptions {
   singleShot?: boolean
 }
 
-interface PlanDecision {
-  approved: boolean
-  feedback?: string
-}
-
 // The SDK is treated as an untyped edge (its option/message types drift across
 // versions); we bind `query` to a minimal local signature so version changes
 // can't break our typecheck. All app-internal types remain strict.
 type LooseQuery = (args: { prompt: unknown; options: Record<string, unknown> }) => AsyncIterable<Record<string, unknown>>
 
 /** Wraps a single live `query()` — its streaming output, steering input queue,
- *  plan-approval gate, and connector policy gate. */
-export class AgentSession {
+ *  plan-approval gate, and connector policy gate. The Claude engine — one of the
+ *  SessionRunner implementations SessionManager drives. */
+export class AgentSession implements SessionRunner {
   readonly id: string
   private info: SessionInfo
   // Recreated on each start/resume — both latch permanently once torn down
