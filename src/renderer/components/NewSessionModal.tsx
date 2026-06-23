@@ -7,12 +7,25 @@ export function NewSessionModal({ onClose, initial }: { onClose: () => void; ini
   const presets = useStore((s) => s.presets)
   const repos = useStore((s) => s.repos)
   const models = useStore((s) => s.models)
+  const engines = useStore((s) => s.engines)
   const defaultModel = useStore((s) => s.settings.defaultModel)
   const spawn = useStore((s) => s.spawn)
   const addRepo = useStore((s) => s.addRepo)
 
+  const availableEngines = engines.filter((e) => e.available)
+  const [engine, setEngine] = useState(initial?.engine ?? 'claude')
+  const engineSpec = engines.find((e) => e.id === engine)
+  const isClaude = engine === 'claude'
   const [presetId, setPresetId] = useState(initial?.presetId ?? 'auto')
   const [model, setModel] = useState(initial?.model ?? defaultModel)
+
+  // Switching engines resets the model to that engine's default (Claude → the
+  // configured default; a CLI engine → its first suggestion / its own default).
+  const onEngineChange = (id: string) => {
+    setEngine(id)
+    if (id === 'claude') setModel(defaultModel)
+    else setModel(engines.find((e) => e.id === id)?.models[0]?.id ?? '')
+  }
   const [cwd, setCwd] = useState(initial?.cwd ?? repos[0]?.path ?? '')
   const [newRepoPath, setNewRepoPath] = useState('')
   const [prompt, setPrompt] = useState(initial?.prompt ?? '')
@@ -41,6 +54,7 @@ export function NewSessionModal({ onClose, initial }: { onClose: () => void; ini
       await spawn({
         prompt: prompt.trim(),
         presetId,
+        engine,
         model,
         cwd: cwd.trim(),
         title: title.trim() || undefined,
@@ -98,19 +112,59 @@ export function NewSessionModal({ onClose, initial }: { onClose: () => void; ini
           )}
         </Label>
 
+        {availableEngines.length > 1 && (
+          <Label text="Engine">
+            <select
+              value={engine}
+              onChange={(e) => onEngineChange(e.target.value)}
+              className="w-full rounded border border-ink-500 bg-ink-700 px-2 py-1.5 text-sm"
+            >
+              {availableEngines.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.label} · {e.vendor}
+                </option>
+              ))}
+            </select>
+            {engineSpec?.note && <p className="mt-1 text-[11px] leading-snug text-[#6b7280]">{engineSpec.note}</p>}
+          </Label>
+        )}
+
         <Label text="Model">
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full rounded border border-ink-500 bg-ink-700 px-2 py-1.5 text-sm"
-          >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-                {m.provider !== 'anthropic' ? ` · ${m.provider}` : ''}
-              </option>
-            ))}
-          </select>
+          {isClaude ? (
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full rounded border border-ink-500 bg-ink-700 px-2 py-1.5 text-sm"
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                  {m.provider !== 'anthropic' ? ` · ${m.provider}` : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              {/* CLI engines span providers — pick a suggestion or type any model the tool accepts. */}
+              <input
+                list={`engine-models-${engine}`}
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="model id (or leave blank for the tool default)"
+                className="w-full rounded border border-ink-500 bg-ink-700 px-2 py-1.5 text-sm"
+              />
+              <datalist id={`engine-models-${engine}`}>
+                {(engineSpec?.models ?? []).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </datalist>
+              <p className="mt-1 text-[11px] leading-snug text-[#6b7280]">
+                One tool, many providers — e.g. {(engineSpec?.models ?? []).slice(0, 3).map((m) => m.id).join(', ') || 'the tool’s default'}.
+              </p>
+            </>
+          )}
         </Label>
 
         <Label text="Working directory">

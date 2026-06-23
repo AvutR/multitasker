@@ -24,6 +24,7 @@ export function Workspace() {
   const selectedId = useStore((s) => s.selectedId)
   const session = useStore((s) => (selectedId ? s.sessions[selectedId] : undefined))
   const models = useStore((s) => s.models)
+  const engines = useStore((s) => s.engines)
   const resume = useStore((s) => s.resume)
   const markDone = useStore((s) => s.markDone)
   // A conductor's sub-agents get their own tab — only when it has delegated any.
@@ -48,6 +49,11 @@ export function Workspace() {
           <div className="truncate text-sm font-medium text-white">{session.title}</div>
           <div className="mt-0.5 flex items-center gap-3 text-[11px] text-[#6b7280]">
             <StatusDot status={session.status} />
+            {session.engine && session.engine !== 'claude' && (
+              <span className="rounded bg-accent/15 px-1.5 py-0.5 font-medium text-accent" title="Engine — the AI coding tool driving this session">
+                {engines.find((e) => e.id === session.engine)?.label ?? session.engine}
+              </span>
+            )}
             {session.model && <span>{models.find((m) => m.id === session.model)?.label ?? session.model}</span>}
             <span>{session.numTurns} turns</span>
             <span className="tabular-nums">{formatCost(session.totalCostUsd)}</span>
