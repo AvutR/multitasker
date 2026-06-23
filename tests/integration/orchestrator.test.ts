@@ -753,6 +753,20 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     expect(r.status).toMatch(/conductor budget/)
   })
 
+  it('heterogeneous delegation refuses an engine that is not installed', async () => {
+    const { repos, bus, actions } = deps()
+    repos.settings.set({ concurrencyCap: 8 })
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    const conductor = await manager.spawn({ prompt: 'go', cwd: '/tmp/p', presetId: 'conduct', useWorktree: false })
+    const orch = (manager as unknown as { deps: { orchestration: { delegate: Function } } }).deps.orchestration
+
+    // gemini isn't installed in CI → the conductor gets a clear refusal, no spawn.
+    const r = (await orch.delegate(conductor.id, { title: 'A', prompt: 'do A', engine: 'gemini' })) as { id: string; status: string }
+    expect(r.id).toBe('')
+    expect(r.status).toMatch(/not installed/)
+  })
+
   it('a delegated child inherits the conductor’s permission mode (no silent de-escalation)', async () => {
     const { repos, bus, actions } = deps()
     repos.settings.set({ concurrencyCap: 8 })

@@ -172,7 +172,9 @@ export class SessionManager {
       sdkSessionId: null,
       title,
       engine,
-      model: req.model ?? settings.defaultModel,
+      // Claude defaults to the configured model alias; a CLI engine with no model
+      // falls through to the tool's own default (null → no --model flag).
+      model: req.model ?? (engine === 'claude' ? settings.defaultModel : null),
       cwd,
       repoId: repo?.id ?? null,
       branch,
@@ -285,7 +287,7 @@ export class SessionManager {
    *  parentId. Goes through the same cap/queue as any session. */
   private async delegate(
     parentId: string,
-    input: { title?: string; prompt: string; model?: string; kind?: string }
+    input: { title?: string; prompt: string; model?: string; kind?: string; engine?: string }
   ): Promise<{ id: string; title: string; status: string }> {
     // Fail-safe: bound how many sub-agents one conductor can spawn so a runaway
     // delegation loop can't fill the queue with unbounded sessions.
@@ -310,14 +312,21 @@ export class SessionManager {
     // 'auto' (default) tiers by task kind — the conductor judges `kind`, we map it,
     // else infer from the prompt. 'fixed' skips tiering and always uses delegateModel,
     // giving the user full control over sub-agent model assignment.
+    // Heterogeneous fan-out: a sub-task can run on ANOTHER installed engine
+    // (cursor/codex/…) — models from different providers in unison. Refuse if the
+    // requested engine isn't installed (so the conductor gets a clear signal).
+    const engine = input.engine ?? 'claude'
+    if (engine !== 'claude' && !engineBinPath(engine as EngineId)) {
+      return { id: '', title: input.title ?? '', status: `refused — engine "${engine}" is not installed` }
+    }
+    // Claude tiering only applies to Claude sub-agents; for another engine, use the
+    // conductor-supplied model (or the tool's own default).
     const judged = input.kind && (TASK_KINDS as string[]).includes(input.kind) ? tierForKind(input.kind as (typeof TASK_KINDS)[number]) : null
-    const autoTier = (settings.tieringStrategy ?? 'auto') === 'auto' ? (judged ?? recommendModelForSubtask(input.prompt)) : null
-    let model = input.model ?? autoTier ?? settings.delegateModel ?? 'sonnet'
+    const autoTier = engine === 'claude' && (settings.tieringStrategy ?? 'auto') === 'auto' ? (judged ?? recommendModelForSubtask(input.prompt)) : null
+    let model = input.model ?? autoTier ?? (engine === 'claude' ? settings.delegateModel ?? 'sonnet' : undefined)
     // Active budget guardrail: once spend crosses the soft budget, downshift
-    // newly-delegated sub-agents one tier cheaper (opt-in 'downshift' mode), so a
-    // fan-out can't keep billing at the priciest tier. The user's own sessions are
-    // never touched — only auto-fanned-out workers.
-    if (settings.overBudgetMode === 'downshift' && settings.budgetUsd && settings.budgetUsd > 0) {
+    // newly-delegated Claude sub-agents one tier cheaper (opt-in 'downshift' mode).
+    if (engine === 'claude' && model && settings.overBudgetMode === 'downshift' && settings.budgetUsd && settings.budgetUsd > 0) {
       const spent = this.repos.sessions.list().reduce((sum, s) => sum + s.totalCostUsd, 0)
       if (spent >= settings.budgetUsd) model = downshiftTier(model)
     }
@@ -325,6 +334,7 @@ export class SessionManager {
       prompt: input.prompt,
       cwd: parent?.cwd ?? process.cwd(),
       presetId: 'explore', // sub-agents are plain workers
+      engine,
       model,
       title: input.title,
       // Inherit (never weaken) the conductor's permission mode — delegation must

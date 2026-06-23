@@ -13,7 +13,7 @@ export interface IntegrationServerOptions {
 /** Lets a conductor session fan work out to cheaper, parallel sub-agents.
  *  Injected by SessionManager so the MCP layer has no orchestrator dependency. */
 export interface Orchestration {
-  delegate: (parentId: string, input: { title?: string; prompt: string; model?: string; kind?: string }) => Promise<{ id: string; title: string; status: string }>
+  delegate: (parentId: string, input: { title?: string; prompt: string; model?: string; kind?: string; engine?: string }) => Promise<{ id: string; title: string; status: string }>
   listChildren: (parentId: string) => { id: string; title: string; status: string; summary: string }[]
   /** Block until the given sub-agents (or all of them) finish, then return their results. */
   waitForChildren: (parentId: string, childIds?: string[]) => Promise<{ id: string; title: string; status: string; summary: string }[]>
@@ -80,16 +80,17 @@ export function createIntegrationMcpServer(actionService: ActionService, session
         ),
         tool(
           'delegate_subtask',
-          'Delegate ONE focused, independent piece of work to a parallel sub-agent in this same repo. Set `kind` to the type of work and the right cheap model is chosen for you (research/docs → Haiku, implement/test/review → Sonnet, orchestrate → Opus). Use this to fan out decomposed work — call it once per independent sub-task. Returns the sub-agent id.',
+          'Delegate ONE focused, independent piece of work to a parallel sub-agent in this same repo. Set `kind` and the right cheap Claude model is chosen for you (research/docs → Haiku, implement/test/review → Sonnet, orchestrate → Opus). Set `engine` to fan work out to ANOTHER installed CLI tool (e.g. "cursor" or "codex") — different providers working in unison; pass `model` for that tool’s model. Call it once per independent sub-task. Returns the sub-agent id.',
           {
             title: z.string().describe('Short title for the sub-task'),
             prompt: z.string().describe('The full, self-contained instruction for the sub-agent'),
-            kind: z.enum(['research', 'docs', 'implement', 'test', 'review', 'orchestrate']).optional().describe('The kind of work — picks the cheapest capable model tier. Omit to auto-detect from the prompt.'),
-            model: z.string().optional().describe('Model id to hard-override the tier (rarely needed)')
+            kind: z.enum(['research', 'docs', 'implement', 'test', 'review', 'orchestrate']).optional().describe('The kind of work — picks the cheapest capable Claude tier. Omit to auto-detect from the prompt.'),
+            engine: z.enum(['claude', 'cursor', 'codex', 'gemini', 'aider']).optional().describe('Which coding tool runs the sub-agent. Default "claude". Use another installed engine to combine providers.'),
+            model: z.string().optional().describe('Model id (Claude tier override, or the chosen engine’s model)')
           },
           async (args) => {
             const r = await orchestration.delegate(sessionId, args)
-            return text(`Delegated "${r.title}" → sub-agent ${r.id} (${r.status}). It runs in parallel on a cheaper model; call list_subtasks to check on it before you synthesize.`)
+            return text(`Delegated "${r.title}" → sub-agent ${r.id} (${r.status}). It runs in parallel; call list_subtasks to check on it before you synthesize.`)
           }
         ),
         tool(

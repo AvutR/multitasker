@@ -61,6 +61,11 @@ export function SubAgentsPanel({ sessionId }: { sessionId: string }) {
                   <div className="truncate text-xs text-[#d7dbe3]">{c.title}</div>
                   <div className="mt-1 flex items-center gap-2">
                     <StatusDot status={c.status} />
+                    {c.engine && c.engine !== 'claude' && (
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent" title="Engine — a different provider working in unison">
+                        {c.engine}
+                      </span>
+                    )}
                     <span className="rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ background: `${color}1a`, color }}>
                       {label}
                     </span>
