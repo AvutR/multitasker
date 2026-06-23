@@ -23,6 +23,7 @@ import type {
   SpawnRequest,
   TranscriptMessage
 } from './types'
+import type { EngineInfo } from './engines'
 
 /** Renderer -> Main request/response API. Each entry: (payload) => result. */
 export interface IpcApi {
@@ -70,6 +71,9 @@ export interface IpcApi {
 
   // Models
   'models:list': () => ModelOption[]
+
+  // Agent engines (Claude Code, Cursor, Codex, …) + which are installed here
+  'engines:list': () => EngineInfo[]
 
   'presets:list': () => LaunchPreset[]
   'settings:get': () => AppSettings

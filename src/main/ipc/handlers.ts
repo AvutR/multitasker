@@ -15,6 +15,7 @@ import { commitAll, computeDiff, readRepoMeta, undoLastCommit } from '../git/Wor
 import { listDir, readFileScoped } from '../fs/fsAccess'
 import { getPreset, loadWorkflows } from '../skills/launchPresets'
 import { listModels } from '../models'
+import { detectEngines } from '../engines'
 import { TtlCache } from '../util/TtlCache'
 
 export interface AppContext {
@@ -106,8 +107,9 @@ export function registerIpcHandlers(ctx: AppContext): void {
   // Shared agent memory for the session's project (keyed by the repo root)
   handle('memory:list', async ({ sessionId }) => listMemory(await projectRoot(cwdFor(sessionId))))
 
-  // Models
+  // Models + engines
   handle('models:list', () => listModels(ctx.repos.settings.get()))
+  handle('engines:list', () => detectEngines())
 
   // Presets / settings / repos
   handle('presets:list', () => loadWorkflows())

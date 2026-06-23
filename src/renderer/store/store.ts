@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { IpcEvent } from '@shared/ipc'
+import type { EngineInfo } from '@shared/engines'
 import type {
   ActionRecord,
   ActionTypeDef,
@@ -35,6 +36,7 @@ interface State {
   linearLoading: boolean
   linearError: string | null
   models: ModelOption[]
+  engines: EngineInfo[]
 
   init: () => Promise<void>
   openBoard: () => void
@@ -90,16 +92,18 @@ export const useStore = create<State>((set, get) => ({
   linearLoading: false,
   linearError: null,
   models: [],
+  engines: [],
 
   init: async () => {
-    const [list, policy, settings, presets, repos, actions, models] = await Promise.all([
+    const [list, policy, settings, presets, repos, actions, models, engines] = await Promise.all([
       window.api.invoke('session:list'),
       window.api.invoke('policy:get'),
       window.api.invoke('settings:get'),
       window.api.invoke('presets:list'),
       window.api.invoke('repos:list'),
       window.api.invoke('actions:list', { limit: 200 }),
-      window.api.invoke('models:list')
+      window.api.invoke('models:list'),
+      window.api.invoke('engines:list')
     ])
     const sessions: Record<string, SessionInfo> = {}
     for (const s of list) sessions[s.id] = s
@@ -113,7 +117,8 @@ export const useStore = create<State>((set, get) => ({
       presets,
       repos,
       actions,
-      models
+      models,
+      engines
     })
     window.api.on((evt) => applyEvent(set, get, evt))
     // Board-first: land on Mission Control, don't auto-drill into a session.
