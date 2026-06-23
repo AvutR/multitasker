@@ -1,8 +1,10 @@
 # Multitasker
 
-A UI editor layer atop **Claude Code** that maximizes multitasking: run, steer, and review **many parallel agent sessions** at once — with Claude Code **skills used by default** and an auditable, **policy-gated automation engine** for Slack, Notion, Linear, and GitHub.
+A UI editor layer for **AI coding agents** that maximizes multitasking: run, steer, and review **many parallel agent sessions** at once — with **Claude Code skills used by default** and an auditable, **policy-gated automation engine** for Slack, Notion, Linear, and GitHub.
 
-One place to drive a dozen parallel workstreams, keep your issue tracker and specs current automatically, and review the work in a VS-Code-grade editor.
+**Not just Claude Code.** Multitasker drives **any major CLI coding tool** — Claude Code (native, via the Agent SDK, with full policy/plan gating + integration tools), plus **Cursor** and **Codex** as headless engines (auto-detected if installed). Pick the engine per session and **any provider's model** (Cursor alone spans OpenAI `gpt-5.x`, Anthropic `claude-opus-4-8`, and Cursor `composer`), and a Claude **conductor can fan sub-tasks out across engines** — models from different providers working one goal in unison. See [`src/shared/engines.ts`](src/shared/engines.ts).
+
+One place to drive a dozen parallel workstreams across tools, keep your issue tracker and specs current automatically, and review the work in a VS-Code-grade editor.
 
 > **Plug-and-play.** Multitasker ships **no skills of its own** — it loads whatever skills/agents/commands you already have installed in Claude Code, and you can drop in your own launch **workflows** from a JSON file (see [Importing workflows](#importing-workflows)). Nothing here is tied to any one team's tooling.
 
