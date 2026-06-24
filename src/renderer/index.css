@@ -76,3 +76,19 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Line-by-line review markers (Monaco decorations) */
+.mt-review-line {
+  box-shadow: inset 3px 0 0 #f5a623;
+  background: rgba(245, 166, 35, 0.06);
+}
+.mt-review-glyph::before {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin: auto;
+  margin-top: 6px;
+  border-radius: 9999px;
+  background: #f5a623;
+}

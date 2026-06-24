@@ -116,5 +116,17 @@ export const MIGRATIONS: Migration[] = [
   {
     name: '0009_session_engine',
     sql: `ALTER TABLE sessions ADD COLUMN engine TEXT;`
+  },
+  {
+    name: '0010_review_comments',
+    sql: `CREATE TABLE review_comments (
+      id          TEXT PRIMARY KEY,
+      session_id  TEXT NOT NULL,
+      rel_path    TEXT NOT NULL,
+      line        INTEGER NOT NULL,
+      body        TEXT NOT NULL,
+      created_at  INTEGER NOT NULL
+    );
+    CREATE INDEX idx_review_session ON review_comments (session_id, rel_path);`
   }
 ]

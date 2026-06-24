@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
 import type { IpcApi, IpcChannel, IpcPayload, IpcResult } from '@shared/ipc'
 import { ACTION_TYPES } from '../integrations/actionTypes'
@@ -59,6 +60,13 @@ export function registerIpcHandlers(ctx: AppContext): void {
   handle('fs:readDir', ({ sessionId, relPath }) => listDir(cwdFor(sessionId), relPath))
   handle('fs:readFile', ({ sessionId, relPath }) => readFileScoped(cwdFor(sessionId), relPath))
   handle('git:diff', ({ sessionId }) => computeDiff(cwdFor(sessionId)))
+
+  // Line-by-line review comments
+  handle('review:list', ({ sessionId }) => ctx.repos.reviews.list(sessionId))
+  handle('review:add', ({ sessionId, relPath, line, body }) =>
+    ctx.repos.reviews.add({ id: randomUUID(), sessionId, relPath, line, body: body.slice(0, 4000), createdAt: Date.now() })
+  )
+  handle('review:delete', ({ id }) => ctx.repos.reviews.delete(id))
   handle('git:commit', async ({ sessionId, message }) => {
     const info = ctx.repos.sessions.get(sessionId)
     if (!info) throw new Error(`session not found: ${sessionId}`)

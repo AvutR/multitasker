@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FileEntry, TranscriptMessage } from '@shared/types'
+import type { FileEntry, ReviewComment, TranscriptMessage } from '@shared/types'
 import { activeFile, recentFiles, relativeTo, type FileAction } from '@shared/activeFile'
 import { taskColor } from '@shared/agentBadge'
 import { useStore } from '../store/store'
-import { MonacoEditor } from './MonacoEditor'
+import { ReviewEditor } from './ReviewEditor'
 import { AgentMascot } from './AgentMascot'
 
 interface OpenFile {
@@ -19,6 +19,7 @@ interface Presence {
   recentRel: Set<string>
   ancestors: Set<string> // ancestor dir relPaths of the active file
   color: string
+  commentCounts: Map<string, number> // relPath → number of review comments
 }
 
 const EMPTY: TranscriptMessage[] = []
@@ -29,6 +30,30 @@ export function CodeView({ sessionId }: { sessionId: string }) {
   const messages = useStore((s) => s.messages[sessionId] ?? EMPTY)
   const [open, setOpen] = useState<OpenFile | null>(null)
   const [follow, setFollow] = useState(false)
+  const [comments, setComments] = useState<ReviewComment[]>([])
+
+  // Line-by-line review comments for this session's files (local — single client).
+  useEffect(() => {
+    let alive = true
+    window.api.invoke('review:list', { sessionId }).then((c) => alive && setComments(c)).catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [sessionId])
+
+  const addComment = async (relPath: string, line: number, body: string) => {
+    const c = await window.api.invoke('review:add', { sessionId, relPath, line, body })
+    setComments((cs) => [...cs, c])
+  }
+  const deleteComment = async (id: string) => {
+    await window.api.invoke('review:delete', { id })
+    setComments((cs) => cs.filter((c) => c.id !== id))
+  }
+  const commentCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of comments) m.set(c.relPath, (m.get(c.relPath) ?? 0) + 1)
+    return m
+  }, [comments])
 
   const cwd = session?.cwd ?? ''
   const color = session ? taskColor(session) : '#6ea8fe'
@@ -56,7 +81,7 @@ export function CodeView({ sessionId }: { sessionId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [follow, activeRel])
 
-  const presence: Presence = { activeRel, action: active?.action ?? null, running: active?.running ?? false, recentRel, ancestors, color }
+  const presence: Presence = { activeRel, action: active?.action ?? null, running: active?.running ?? false, recentRel, ancestors, color, commentCounts }
 
   return (
     <div className="grid h-full min-h-0" style={{ gridTemplateColumns: '280px minmax(0, 1fr)' }}>
@@ -79,9 +104,15 @@ export function CodeView({ sessionId }: { sessionId: string }) {
       </div>
       <div className="min-h-0">
         {open ? (
-          <MonacoEditor value={open.content} language={open.language} />
+          <ReviewEditor
+            value={open.content}
+            language={open.language}
+            comments={comments.filter((c) => c.relPath === open.relPath)}
+            onAdd={(line, body) => addComment(open.relPath, line, body)}
+            onDelete={deleteComment}
+          />
         ) : (
-          <div className="grid h-full place-items-center text-xs text-[#5b6472]">Open a file to view it.</div>
+          <div className="grid h-full place-items-center text-xs text-[#5b6472]">Open a file — click a line’s gutter to leave a review comment.</div>
         )}
       </div>
     </div>
@@ -173,6 +204,11 @@ function Node({
         {isAncestor && !open && <AgentMascot color={presence.color} running={presence.running} size={12} title="agent is working in here" />}
         {isRecent && (
           <span className="ml-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: `${presence.color}aa` }} title="recently touched" />
+        )}
+        {!entry.isDir && presence.commentCounts.has(entry.relPath) && (
+          <span className="ml-auto shrink-0 rounded bg-[#f5a623]/20 px-1 text-[9px] font-semibold text-[#f5a623]" title="review comments">
+            {presence.commentCounts.get(entry.relPath)}
+          </span>
         )}
       </button>
       {entry.isDir && open && <Dir sessionId={sessionId} relPath={entry.relPath} depth={depth + 1} onOpen={onOpen} presence={presence} />}

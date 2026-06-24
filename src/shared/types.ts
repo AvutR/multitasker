@@ -320,6 +320,16 @@ export interface FileEntry {
   isDir: boolean
 }
 
+/** A line-anchored review note on a file in a session's tree (Cursor/VSCode-style). */
+export interface ReviewComment {
+  id: string
+  sessionId: string
+  relPath: string
+  line: number // 1-based
+  body: string
+  createdAt: number
+}
+
 export interface FileContent {
   relPath: string
   content: string

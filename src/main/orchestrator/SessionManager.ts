@@ -448,6 +448,7 @@ export class SessionManager {
     if (idx >= 0) this.pending.splice(idx, 1)
     this.repos.messages.deleteBySession(id)
     this.repos.actions.deleteBySession(id)
+    this.repos.reviews.deleteBySession(id)
     this.repos.sessions.delete(id)
     this.bus.emit({ channel: 'session:deleted', payload: { id } })
   }

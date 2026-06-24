@@ -19,6 +19,7 @@ import type {
   PolicyState,
   ActionTypeDef,
   RepoInfo,
+  ReviewComment,
   SessionInfo,
   SpawnRequest,
   TranscriptMessage
@@ -45,6 +46,11 @@ export interface IpcApi {
   'fs:readDir': (args: { sessionId: string; relPath: string }) => FileEntry[]
   'fs:readFile': (args: { sessionId: string; relPath: string }) => FileContent
   'git:diff': (args: { sessionId: string }) => DiffFile[]
+
+  // Line-by-line review comments on a session's files
+  'review:list': (args: { sessionId: string }) => ReviewComment[]
+  'review:add': (args: { sessionId: string; relPath: string; line: number; body: string }) => ReviewComment
+  'review:delete': (args: { id: string }) => void
   'git:commit': (args: { sessionId: string; message: string }) => CommitResult
   'git:undoLastCommit': (args: { sessionId: string }) => { undone: boolean; subject?: string; reason?: string }
 

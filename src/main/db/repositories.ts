@@ -3,6 +3,7 @@ import type {
   AppSettings,
   PolicyMode,
   RepoInfo,
+  ReviewComment,
   SessionInfo,
   TranscriptMessage
 } from '@shared/types'
@@ -407,6 +408,35 @@ export class RepoRepo {
   }
 }
 
+export class ReviewRepo {
+  constructor(private db: Db) {}
+
+  add(c: ReviewComment): ReviewComment {
+    this.db
+      .prepare('INSERT INTO review_comments (id, session_id, rel_path, line, body, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(c.id, c.sessionId, c.relPath, c.line, c.body, c.createdAt)
+    return c
+  }
+
+  /** All comments for a session (optionally one file), oldest first. */
+  list(sessionId: string, relPath?: string): ReviewComment[] {
+    const rows = (
+      relPath
+        ? this.db.prepare('SELECT * FROM review_comments WHERE session_id = ? AND rel_path = ? ORDER BY line, created_at').all(sessionId, relPath)
+        : this.db.prepare('SELECT * FROM review_comments WHERE session_id = ? ORDER BY rel_path, line, created_at').all(sessionId)
+    ) as { id: string; session_id: string; rel_path: string; line: number; body: string; created_at: number }[]
+    return rows.map((r) => ({ id: r.id, sessionId: r.session_id, relPath: r.rel_path, line: r.line, body: r.body, createdAt: r.created_at }))
+  }
+
+  delete(id: string): void {
+    this.db.prepare('DELETE FROM review_comments WHERE id = ?').run(id)
+  }
+
+  deleteBySession(sessionId: string): void {
+    this.db.prepare('DELETE FROM review_comments WHERE session_id = ?').run(sessionId)
+  }
+}
+
 export interface Repositories {
   sessions: SessionRepo
   messages: MessageRepo
@@ -414,6 +444,7 @@ export interface Repositories {
   policies: PolicyRepo
   settings: SettingsRepo
   repos: RepoRepo
+  reviews: ReviewRepo
 }
 
 export function createRepositories(db: Db): Repositories {
@@ -423,6 +454,7 @@ export function createRepositories(db: Db): Repositories {
     actions: new ActionRepo(db),
     policies: new PolicyRepo(db),
     settings: new SettingsRepo(db),
-    repos: new RepoRepo(db)
+    repos: new RepoRepo(db),
+    reviews: new ReviewRepo(db)
   }
 }
