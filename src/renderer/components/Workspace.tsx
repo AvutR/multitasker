@@ -15,7 +15,7 @@ import { TrustBar } from './TrustBar'
 type Tab = 'transcript' | 'code' | 'diff' | 'ci' | 'memory' | 'subagents'
 const BASE_TABS: { id: Tab; label: string }[] = [
   { id: 'transcript', label: 'Transcript' },
-  { id: 'code', label: 'Code' },
+  { id: 'code', label: 'Files' },
   { id: 'diff', label: 'Diff' },
   { id: 'ci', label: 'CI/CD' },
   { id: 'memory', label: 'Memory' }
