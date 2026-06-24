@@ -8,6 +8,7 @@ import type { Repositories } from '../db/repositories'
 import type { EventBus } from '../events'
 import { engineCommand, engineProtocol } from '../engines'
 import type { PlanDecision, SessionRunner } from './SessionRunner'
+import { bridgeEnv } from './SpawnBridge'
 
 export interface CliRunnerDeps {
   repos: Repositories
@@ -143,7 +144,9 @@ export class CliSessionRunner implements SessionRunner {
     try {
       child = spawn(this.binPath, args, {
         cwd: this.info.cwd,
-        env: { ...process.env, ...(env ?? {}) },
+        // Inherit env + the cross-provider spin-off bridge (`mt` on PATH) so this
+        // CLI agent can recruit a sub-agent of any provider.
+        env: { ...process.env, ...bridgeEnv(this.info.id), ...(env ?? {}) },
         stdio: ['ignore', 'pipe', 'pipe'] // no stdin — prompt is passed as an arg
       })
     } catch (err) {

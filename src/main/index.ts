@@ -4,6 +4,7 @@ import { app, BrowserWindow, session, shell } from 'electron'
 import { EVENT_CHANNEL } from '@shared/ipc'
 import { openDatabase } from './db/database'
 import { createRepositories } from './db/repositories'
+import { SpawnBridge } from './orchestrator/SpawnBridge'
 import { EventBus } from './events'
 import { WorktreeManager } from './git/Worktrees'
 import { ActionService, seedDefaultPolicies } from './integrations/ActionService'
@@ -129,6 +130,11 @@ function bootstrap(): void {
   const automation = new LifecycleAutomation(bus, actions)
   const sessions = new SessionManager(repos, bus, actions, worktrees, automation)
   sessions.reconcileOnStartup()
+  // Cross-provider spin-off: a loopback bridge so any agent can recruit a
+  // sub-agent of any provider via the `mt` shim. Loopback + token-gated.
+  const bridge = new SpawnBridge((parentId, input) => sessions.spawnSubAgent(parentId, input), join(app.getPath('userData'), 'bin'))
+  void bridge.start()
+  app.on('will-quit', () => bridge.stop())
   const linear = new LinearService(new SdkLinearReader())
 
   const ctx: AppContext = { repos, bus, sessions, actions, worktrees, linear }

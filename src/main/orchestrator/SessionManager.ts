@@ -31,6 +31,10 @@ const LIVE_STATUSES = ['queued', 'running', 'awaiting_input', 'awaiting_plan_app
 /** Hard ceiling on sub-agents a single conductor may spawn (runaway-loop guard). */
 const MAX_DELEGATIONS = 25
 
+/** Max delegation tree depth — bounds cross-provider spin-off (children recruiting
+ *  via the `mt` bridge) so a fan-out can't recurse without bound. */
+const MAX_DELEGATION_DEPTH = 3
+
 /** One tier cheaper for the over-budget guardrail; haiku is the floor, and any
  *  non-tier model id (gateway/fable/bedrock/…) is left untouched. */
 function downshiftTier(model: string): string {
@@ -282,6 +286,26 @@ export class SessionManager {
     return session.proposePlan(formatDecomposition(subtasks))
   }
 
+  /** Public spawn entrypoint for the cross-provider `mt` bridge — an agent of any
+   *  provider recruiting a sub-agent of any provider. Same bounds as delegate(). */
+  async spawnSubAgent(parentId: string, input: { engine?: string; prompt: string; title?: string }): Promise<{ id: string; title: string; status: string }> {
+    if (!this.repos.sessions.get(parentId)) return { id: '', title: input.title ?? '', status: 'refused — unknown parent session' }
+    return this.delegate(parentId, input)
+  }
+
+  /** How many parentId hops to the root (0 = top-level). Cycle-safe. */
+  private depthOf(id: string): number {
+    let depth = 0
+    let cur = this.repos.sessions.get(id)
+    const seen = new Set<string>([id])
+    while (cur?.parentId && !seen.has(cur.parentId)) {
+      seen.add(cur.parentId)
+      depth++
+      cur = this.repos.sessions.get(cur.parentId)
+    }
+    return depth
+  }
+
   /** Spawn a sub-agent for a conductor. The child runs on the cheaper delegate
    *  model, in the conductor's working directory (shared worktree), linked by
    *  parentId. Goes through the same cap/queue as any session. */
@@ -294,6 +318,10 @@ export class SessionManager {
     const existing = this.repos.sessions.list().filter((s) => s.parentId === parentId).length
     if (existing >= MAX_DELEGATIONS) {
       return { id: '', title: input.title ?? '', status: `refused — delegation limit (${MAX_DELEGATIONS}) reached` }
+    }
+    // Depth bound: cross-provider spin-off lets children recruit too — cap tree depth.
+    if (this.depthOf(parentId) >= MAX_DELEGATION_DEPTH) {
+      return { id: '', title: input.title ?? '', status: `refused — max delegation depth (${MAX_DELEGATION_DEPTH}) reached` }
     }
     const parent = this.repos.sessions.get(parentId)
     const settings = this.repos.settings.get()

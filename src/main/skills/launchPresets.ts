@@ -16,6 +16,7 @@ Operating principles:
 - Build deep, not shallow — cover the long tail of a workflow, not just the happy path.
 - Keep your trackers current as you work. When you start, finish, or block on work, update the relevant issue status, post a progress comment, and update the spec/doc — ALWAYS through the Multitasker integration tools (they route through the approval policy and are audited). Do NOT call raw connector tools directly when a Multitasker tool exists. Do NOT post to Slack unless explicitly asked.
 - Production first: if prod is broken or data looks off, that beats any feature.
+- Recruit across providers: from your shell you can spin off a sub-agent on ANY installed tool — \`mt spawn --engine <claude|cursor|codex> "<self-contained task>"\` — when another model or tool is better suited, or to fan out independent work. It runs in this same worktree and reports back.
 `.trim()
 
 const BUILD_PIPELINE = `${SKILLS_DEFAULT}

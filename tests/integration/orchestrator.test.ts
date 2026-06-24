@@ -753,6 +753,25 @@ describe('agentic orchestration: conductor → cheaper sub-agents', () => {
     expect(r.status).toMatch(/conductor budget/)
   })
 
+  it('spawnSubAgent refuses past the max delegation depth (bounds cross-provider recursion)', async () => {
+    const { repos, bus, actions } = deps()
+    h.queryImpl = () => (async function* () {})()
+    const manager = new SessionManager(repos, bus, actions, new WorktreeManager('/tmp/wt-test'), new LifecycleAutomation(bus, actions))
+    // A parent chain at depths 0 → 1 → 2 → 3.
+    makeInfo(repos, { id: 'r' })
+    makeInfo(repos, { id: 'd1', parentId: 'r' })
+    makeInfo(repos, { id: 'd2', parentId: 'd1' })
+    makeInfo(repos, { id: 'd3', parentId: 'd2' })
+
+    const r = await manager.spawnSubAgent('d3', { prompt: 'recurse further', engine: 'claude' })
+    expect(r.id).toBe('')
+    expect(r.status).toMatch(/max delegation depth/)
+
+    // ...but a shallower parent can still recruit.
+    const ok = await manager.spawnSubAgent('r', { prompt: 'help out', engine: 'claude' })
+    expect(ok.id).not.toBe('')
+  })
+
   it('heterogeneous delegation refuses an engine that is not installed', async () => {
     const { repos, bus, actions } = deps()
     repos.settings.set({ concurrencyCap: 8 })

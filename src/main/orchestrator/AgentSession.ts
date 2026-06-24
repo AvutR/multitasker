@@ -11,6 +11,7 @@ import { projectRoot } from '../util/projectRoot'
 import { AsyncQueue } from '../util/AsyncQueue'
 import { assistantBlocks, extractDelta, isExitPlanTool, userBlocks } from './sdkMapping'
 import type { PlanDecision, SessionRunner } from './SessionRunner'
+import { bridgeEnv } from './SpawnBridge'
 
 export interface SessionDeps {
   repos: Repositories
@@ -193,12 +194,12 @@ export class AgentSession implements SessionRunner {
     // Resolve the selected model to its SDK model string + any provider env.
     const { sdkModel, env } = resolveModel(this.info.model, this.deps.repos.settings.get())
     options.model = sdkModel
-    if (env) {
-      // The SDK's `env` REPLACES the subprocess environment, so carry process.env forward.
-      const merged: Record<string, string> = {}
-      for (const [k, v] of Object.entries(process.env)) if (v !== undefined) merged[k] = v
-      options.env = { ...merged, ...env }
-    }
+    // The SDK's `env` REPLACES the subprocess environment, so carry process.env
+    // forward — plus the cross-provider spin-off bridge (`mt` on PATH) and any
+    // provider override last.
+    const merged: Record<string, string> = {}
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) merged[k] = v
+    options.env = { ...merged, ...bridgeEnv(this.info.id), ...(env ?? {}) }
     if (resume?.resume) {
       options.resume = resume.resume
       if (resume.fork) options.forkSession = true
