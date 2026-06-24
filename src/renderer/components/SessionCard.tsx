@@ -1,5 +1,6 @@
 import type { SessionInfo } from '@shared/types'
 import { isRevivableStatus } from '@shared/board'
+import { shortLabel, taskColor } from '@shared/agentBadge'
 import { useStore } from '../store/store'
 import { Badge, formatCost, StatusDot } from './bits'
 import { Icon } from './Icon'
@@ -61,12 +62,17 @@ export function SessionCard({
     void select(session.id)
   }
 
+  const color = taskColor(session)
+  const tag = shortLabel(session)
+
   return (
     <div
       className={`group relative rounded-lg border transition-colors ${
         selected ? 'border-accent bg-accent/10 ring-1 ring-accent' : needsYou ? 'border-[#f5c451]/50 bg-[#f5c451]/5' : 'border-ink-600 bg-ink-800 hover:bg-ink-700'
       } ${session.pinned && !selected ? 'ring-1 ring-accent/40' : ''}`}
     >
+      {/* Task color stripe — the board reads at a glance, color-coded by task. */}
+      <span className="pointer-events-none absolute bottom-2 left-0 top-2 w-1 rounded-r" style={{ background: color }} />
       {onToggleSelect && (
         <button
           onClick={(e) => {
@@ -87,7 +93,16 @@ export function SessionCard({
         className="block w-full rounded-lg p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate pr-14 text-sm text-[#d7dbe3]">{session.title}</span>
+          <div className="flex min-w-0 items-center gap-1.5 pr-14">
+            <span
+              className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none"
+              style={{ background: `${color}26`, color }}
+              title={`Task ${tag}`}
+            >
+              {tag}
+            </span>
+            <span className="truncate text-sm text-[#d7dbe3]">{session.title}</span>
+          </div>
           {/* Fade the cost out on hover so the action icons swap into the same
               top-right corner instead of colliding with the number. */}
           <span className="shrink-0 text-[10px] tabular-nums text-[#5b6472] transition-opacity duration-200 group-hover:opacity-0">

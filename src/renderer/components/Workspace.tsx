@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { isRevivableStatus } from '@shared/board'
+import { shortLabel, taskColor } from '@shared/agentBadge'
 import { useStore } from '../store/store'
 import { Icon } from './Icon'
 import { formatCost, StatusDot } from './bits'
@@ -46,7 +47,12 @@ export function Workspace() {
     <section className="flex min-h-0 flex-col bg-ink-900">
       <div className="flex items-center justify-between border-b border-ink-600 px-3 py-2">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-white">{session.title}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none" style={{ background: `${taskColor(session)}26`, color: taskColor(session) }}>
+              {shortLabel(session)}
+            </span>
+            <span className="truncate text-sm font-medium text-white">{session.title}</span>
+          </div>
           <div className="mt-0.5 flex items-center gap-3 text-[11px] text-[#6b7280]">
             <StatusDot status={session.status} />
             {session.engine && session.engine !== 'claude' && (
