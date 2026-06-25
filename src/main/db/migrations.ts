@@ -128,5 +128,12 @@ export const MIGRATIONS: Migration[] = [
       created_at  INTEGER NOT NULL
     );
     CREATE INDEX idx_review_session ON review_comments (session_id, rel_path);`
+  },
+  {
+    // Coalesce repeated identical actions (e.g. an agent retrying a raw `git push`
+    // that the guard keeps blocking) into ONE audit row with a repeat tally,
+    // instead of spamming the feed with N copies.
+    name: '0011_action_repeat_count',
+    sql: `ALTER TABLE actions ADD COLUMN repeat_count INTEGER NOT NULL DEFAULT 1;`
   }
 ]

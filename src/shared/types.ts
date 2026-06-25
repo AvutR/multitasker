@@ -180,6 +180,9 @@ export interface ActionRecord {
   error: string | null
   createdAt: number
   decidedAt: number | null
+  /** How many identical attempts collapsed onto this row (1 = a single attempt).
+   *  An agent retrying a blocked raw call bumps this instead of spamming new rows. */
+  repeatCount: number
 }
 
 export interface PolicyState {

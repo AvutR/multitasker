@@ -73,6 +73,7 @@ interface ActionRow {
   error: string | null
   created_at: number
   decided_at: number | null
+  repeat_count: number | null
 }
 
 // --- mappers ---------------------------------------------------------------
@@ -155,7 +156,8 @@ function toAction(r: ActionRow): ActionRecord {
     result: r.result_json ? JSON.parse(r.result_json) : null,
     error: r.error,
     createdAt: r.created_at,
-    decidedAt: r.decided_at
+    decidedAt: r.decided_at,
+    repeatCount: r.repeat_count ?? 1
   }
 }
 
@@ -265,8 +267,8 @@ export class ActionRepo {
     this.db
       .prepare(
         `INSERT INTO actions (id, session_id, action_type, connector, direction, summary, payload_json,
-           status, decided_by, result_json, error, created_at, decided_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           status, decided_by, result_json, error, created_at, decided_at, repeat_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         a.id,
@@ -281,8 +283,16 @@ export class ActionRepo {
         a.result ? JSON.stringify(a.result) : null,
         a.error,
         a.createdAt,
-        a.decidedAt
+        a.decidedAt,
+        a.repeatCount ?? 1
       )
+  }
+
+  /** Collapse a repeated identical attempt onto an existing row: bump its tally
+   *  and float it to the top (created_at = now) so the feed shows one live entry. */
+  bumpRepeat(id: string, now = Date.now()): ActionRecord | null {
+    this.db.prepare('UPDATE actions SET repeat_count = repeat_count + 1, created_at = ? WHERE id = ?').run(now, id)
+    return this.get(id)
   }
 
   update(id: string, patch: Partial<ActionRecord>): ActionRecord | null {

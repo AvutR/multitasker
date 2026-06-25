@@ -84,7 +84,7 @@ export class ActionService {
     // issue to "In Progress". Collapse an identical action that already fired or
     // is awaiting approval within a short window so the connector isn't hit twice.
     const dup = this.recentDuplicate(input.actionType, input.payload)
-    if (dup) return dup
+    if (dup) return this.bump(dup) // collapse + tally the repeat instead of a 2nd row
 
     const decision = this.evaluate(input.actionType)
     if (!decision) {
@@ -114,28 +114,27 @@ export class ActionService {
     const decision = this.evaluate(input.actionType)
     if (!decision) return { allow: true, record: null } // unknown/non-gated tool — let it run
     const def = ACTION_TYPE_BY_ID[input.actionType]
+    // A retry of the same raw call coalesces onto its existing row (no spam); the
+    // policy verdict below is unchanged — only the audit copy is de-duplicated.
+    const recent = this.recentSameCall(input.actionType, input.payload)
     switch (decision.effect) {
       case 'fire': {
         // Allow the agent to perform it; record that it fired (executed by the agent).
-        const rec = this.record({
-          ...input,
-          status: 'fired',
-          decidedBy: 'auto',
-          decidedAt: Date.now(),
-          result: { via: 'agent' }
-        })
+        const rec = recent
+          ? this.bump(recent)
+          : this.record({ ...input, status: 'fired', decidedBy: 'auto', decidedAt: Date.now(), result: { via: 'agent' } })
         return { allow: true, record: rec }
       }
       case 'dry_run': {
-        const rec = this.record({ ...input, status: 'dry_run', decidedBy: 'dry_run' })
+        const rec = recent ? this.bump(recent) : this.record({ ...input, status: 'dry_run', decidedBy: 'dry_run' })
         return { allow: false, record: rec, message: `[dry-run] ${def.label} not executed — intent recorded in Multitasker.` }
       }
       case 'queue': {
-        const rec = this.record({ ...input, status: 'pending', decidedBy: null })
+        const rec = recent ? this.bump(recent) : this.record({ ...input, status: 'pending', decidedBy: null })
         return { allow: false, record: rec, message: `${def.label} is queued for one-click approval in Multitasker. Continue with other work.` }
       }
       case 'drop': {
-        const rec = this.record({ ...input, status: 'dropped', decidedBy: decision.decidedBy })
+        const rec = recent ? this.bump(recent) : this.record({ ...input, status: 'dropped', decidedBy: decision.decidedBy })
         return { allow: false, record: rec, message: decision.reason }
       }
     }
@@ -182,6 +181,27 @@ export class ActionService {
       }
     }
     return null
+  }
+
+  /** The most recent identical attempt regardless of outcome — so an agent
+   *  retrying a BLOCKED raw call (rejected/dropped/queued) coalesces onto the
+   *  one row instead of spamming the feed with a fresh copy each time. */
+  private recentSameCall(actionType: string, payload: unknown): ActionRecord | null {
+    const key = stableKey(payload)
+    const cutoff = Date.now() - DEDUP_WINDOW_MS
+    for (const a of this.repos.actions.list(50)) {
+      if (a.createdAt < cutoff) break
+      if (a.actionType === actionType && stableKey(a.payload) === key) return a
+    }
+    return null
+  }
+
+  /** Tally a repeated attempt onto an existing row and re-surface it, live. */
+  private bump(rec: ActionRecord): ActionRecord {
+    const updated = this.repos.actions.bumpRepeat(rec.id)
+    if (!updated) return rec
+    this.bus.emit({ channel: 'action:updated', payload: updated })
+    return updated
   }
 
   private evaluate(actionTypeId: string) {
@@ -242,7 +262,8 @@ export class ActionService {
       result: input.result ?? null,
       error: input.error ?? null,
       createdAt: Date.now(),
-      decidedAt: input.decidedAt ?? null
+      decidedAt: input.decidedAt ?? null,
+      repeatCount: 1
     }
     this.repos.actions.insert(rec)
     this.bus.emit({ channel: 'action:created', payload: rec })

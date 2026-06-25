@@ -298,6 +298,8 @@ function applyEvent(
       set((st) => {
         const exists = st.actions.some((x) => x.id === a.id)
         const merged = exists ? st.actions.map((x) => (x.id === a.id ? a : x)) : [a, ...st.actions]
+        // Keep newest-first; a coalesced repeat refreshes createdAt and re-surfaces.
+        merged.sort((x, y) => y.createdAt - x.createdAt)
         return { actions: merged.length > MAX_ACTIONS ? merged.slice(0, MAX_ACTIONS) : merged }
       })
       break

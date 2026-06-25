@@ -134,12 +134,46 @@ describe('ActionService.guard (path #2 — raw connector call, agent executes on
 })
 
 describe('audit log', () => {
-  it('every decision writes an append-only action row', async () => {
+  it('every DISTINCT decision writes an append-only action row', async () => {
     const { svc } = setup(false)
-    await svc.propose({ ...base, actionType: 'linear.status_update' }) // fired
-    await svc.propose({ ...base, actionType: 'slack.message' }) // pending
-    await svc.guard({ ...base, actionType: 'slack.message' }) // pending (raw)
+    await svc.propose({ ...base, actionType: 'linear.status_update', payload: { issueId: 'A' } }) // fired
+    await svc.propose({ ...base, actionType: 'slack.message', payload: { channel: 'a' } }) // pending
+    await svc.guard({ ...base, actionType: 'slack.message', payload: { channel: 'b' } }) // pending (raw, distinct)
     expect(svc.list()).toHaveLength(3)
+  })
+})
+
+describe('repeat coalescing — no audit-log spam from retried raw calls', () => {
+  it('an agent retrying the SAME blocked raw call collapses onto one row with a tally', async () => {
+    const { svc, repos } = setup(false)
+    repos.policies.setMode('github.push_branch', 'off') // force the call to be rejected/dropped
+    const payload = { branch: 'feature/x', cwd: '/repo' }
+    for (let i = 0; i < 6; i++) await svc.guard({ ...base, actionType: 'github.push_branch', payload })
+    const rows = svc.list().filter((a) => a.actionType === 'github.push_branch')
+    expect(rows).toHaveLength(1) // six attempts → ONE row, not six
+    expect(rows[0].repeatCount).toBe(6)
+    expect(rows[0].status).toBe('dropped')
+  })
+
+  it('a DIFFERENT payload still gets its own row (only identical calls coalesce)', async () => {
+    const { svc, repos } = setup(false)
+    repos.policies.setMode('slack.message', 'off')
+    await svc.guard({ ...base, actionType: 'slack.message', payload: { channel: 'one' } })
+    await svc.guard({ ...base, actionType: 'slack.message', payload: { channel: 'one' } }) // coalesces
+    await svc.guard({ ...base, actionType: 'slack.message', payload: { channel: 'two' } }) // distinct
+    const rows = svc.list().filter((a) => a.actionType === 'slack.message')
+    expect(rows).toHaveLength(2)
+    expect(rows.find((r) => (r.payload as { channel: string }).channel === 'one')?.repeatCount).toBe(2)
+  })
+
+  it('propose() also tallies a collapsed idempotent duplicate', async () => {
+    const { svc } = setup(false)
+    const payload = { issueId: 'ENG-1', state: 'In Progress' }
+    await svc.propose({ ...base, actionType: 'linear.status_update', payload })
+    await svc.propose({ ...base, actionType: 'linear.status_update', payload }) // dup within window
+    const rows = svc.list().filter((a) => a.actionType === 'linear.status_update')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].repeatCount).toBe(2)
   })
 })
 

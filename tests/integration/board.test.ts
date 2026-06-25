@@ -39,6 +39,7 @@ function action(over: Partial<ActionRecord>): ActionRecord {
     error: null,
     createdAt: 0,
     decidedAt: null,
+    repeatCount: 1,
     ...over
   }
 }
