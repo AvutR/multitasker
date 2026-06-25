@@ -2,6 +2,7 @@
 // Request/response channels go through ipcRenderer.invoke -> ipcMain.handle.
 // Streaming server->client events are multiplexed over one 'app:event' channel.
 
+import type { BrainSkill, BrainStats } from './brain'
 import type {
   ActionRecord,
   AppSettings,
@@ -74,6 +75,11 @@ export interface IpcApi {
 
   // Shared agent memory for a session's project (remember/recall)
   'memory:list': (args: { sessionId: string }) => MemoryNote[]
+
+  // Central brain — learned skills that grow with each task (scoped to a session's project + global)
+  'brain:list': (args: { sessionId?: string }) => { skills: BrainSkill[]; stats: BrainStats }
+  'brain:setPinned': (args: { id: string; pinned: boolean }) => void
+  'brain:delete': (args: { id: string }) => void
 
   // Models
   'models:list': () => ModelOption[]

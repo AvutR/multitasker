@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { ActionRecord } from '@shared/types'
 import type { ActionService } from './ActionService'
 import { recall, remember } from './agentMemory'
+import { learn, recallSkills } from './brainStore'
 
 export interface IntegrationServerOptions {
   orchestration?: Orchestration
@@ -54,6 +55,29 @@ export function createIntegrationMcpServer(actionService: ActionService, session
           async (args) => {
             const notes = recall(memoryRoot, args.query)
             return text(notes.length ? notes.map((n) => `• ${n.text}${n.tag ? ` [${n.tag}]` : ''}`).join('\n') : 'No memory yet for this project.')
+          }
+        ),
+        tool(
+          'learn',
+          "Teach Multitasker's central BRAIN a durable, reusable SKILL you figured out — a how-to, a gotcha, where something lives (map), or a pattern. Future tasks in this space recall it up front so they don't re-derive it (faster, fewer tokens). Be concise and generally reusable, not task-specific play-by-play. Call this whenever you learn something worth keeping.",
+          {
+            title: z.string().describe('Short, searchable title (e.g. "auth lives in src/main/auth")'),
+            body: z.string().describe('The reusable knowledge, concise (a few sentences max)'),
+            kind: z.enum(['skill', 'gotcha', 'map', 'pattern']).optional().describe('skill=how-to, gotcha=pitfall, map=where things live, pattern=approach'),
+            global: z.boolean().optional().describe('Set true if it applies across ALL projects, not just this repo')
+          },
+          async (args) => {
+            const s = learn(args.global ? 'global' : memoryRoot, { title: args.title, body: args.body, kind: args.kind, sessionId })
+            return text(`Learned "${s.title}" → the brain (${s.scope === 'global' ? 'global' : 'this project'}). Future tasks will recall it.`)
+          }
+        ),
+        tool(
+          'recall_skills',
+          "Search the central BRAIN for learned skills relevant to a query (this project's + global). Call this before tackling something to reuse what past agents learned instead of rediscovering it.",
+          { query: z.string().describe('What you are about to work on') },
+          async (args) => {
+            const skills = recallSkills(memoryRoot, args.query)
+            return text(skills.length ? skills.map((s) => `• [${s.kind}] ${s.title} — ${s.body}`).join('\n') : 'No learned skills yet for this space.')
           }
         )
       ]

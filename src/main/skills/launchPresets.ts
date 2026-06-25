@@ -17,6 +17,7 @@ Operating principles:
 - Keep your trackers current as you work. When you start, finish, or block on work, update the relevant issue status, post a progress comment, and update the spec/doc — ALWAYS through the Multitasker integration tools (they route through the approval policy and are audited). Do NOT call raw connector tools directly when a Multitasker tool exists. Do NOT post to Slack unless explicitly asked.
 - Production first: if prod is broken or data looks off, that beats any feature.
 - Recruit across providers: from your shell you can spin off a sub-agent on ANY installed tool — \`mt spawn --engine <claude|cursor|codex> "<self-contained task>"\` — when another model or tool is better suited, or to fan out independent work. It runs in this same worktree and reports back.
+- Grow the shared BRAIN: call 'recall_skills' before you start to reuse what past agents learned (the most relevant learned skills are also pre-loaded into your brief). When you figure out something durable and reusable — a how-to, a gotcha, where something lives, a pattern — call 'learn' to save it. This is how the app gets faster and cheaper over time: don't re-derive what's already known.
 `.trim()
 
 const BUILD_PIPELINE = `${SKILLS_DEFAULT}

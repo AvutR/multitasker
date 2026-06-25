@@ -9,16 +9,18 @@ import { CodeView } from './CodeView'
 import { DiffView } from './DiffView'
 import { CIPanel } from './CIPanel'
 import { MemoryPanel } from './MemoryPanel'
+import { BrainPanel } from './BrainPanel'
 import { SubAgentsPanel } from './SubAgentsPanel'
 import { TrustBar } from './TrustBar'
 
-type Tab = 'transcript' | 'code' | 'diff' | 'ci' | 'memory' | 'subagents'
+type Tab = 'transcript' | 'code' | 'diff' | 'ci' | 'memory' | 'brain' | 'subagents'
 const BASE_TABS: { id: Tab; label: string }[] = [
   { id: 'transcript', label: 'Transcript' },
   { id: 'code', label: 'Files' },
   { id: 'diff', label: 'Diff' },
   { id: 'ci', label: 'CI/CD' },
-  { id: 'memory', label: 'Memory' }
+  { id: 'memory', label: 'Memory' },
+  { id: 'brain', label: 'Brain' }
 ]
 
 export function Workspace() {
@@ -108,6 +110,7 @@ export function Workspace() {
         {activeTab === 'diff' && <DiffView sessionId={session.id} />}
         {activeTab === 'ci' && <CIPanel sessionId={session.id} />}
         {activeTab === 'memory' && <MemoryPanel sessionId={session.id} />}
+        {activeTab === 'brain' && <BrainPanel sessionId={session.id} />}
         {activeTab === 'subagents' && <SubAgentsPanel sessionId={session.id} />}
       </div>
     </section>

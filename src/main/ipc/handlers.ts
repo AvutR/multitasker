@@ -7,6 +7,7 @@ import type { LinearService } from '../integrations/LinearService'
 import { getActiveTracker, listProviderIds } from '../integrations/trackers/registry'
 import { getActiveCIProvider, listCIProviderIds } from '../integrations/ci/registry'
 import { listMemory } from '../integrations/agentMemory'
+import { brainStats, deleteSkill, listSkills, setSkillPinned } from '../integrations/brainStore'
 import { projectRoot } from '../util/projectRoot'
 import type { EventBus } from '../events'
 import type { Repositories } from '../db/repositories'
@@ -114,6 +115,14 @@ export function registerIpcHandlers(ctx: AppContext): void {
 
   // Shared agent memory for the session's project (keyed by the repo root)
   handle('memory:list', async ({ sessionId }) => listMemory(await projectRoot(cwdFor(sessionId))))
+
+  // Central brain — learned skills (this project's + global when a session is given, else everything)
+  handle('brain:list', async ({ sessionId }) => {
+    const scope = sessionId ? await projectRoot(cwdFor(sessionId)) : undefined
+    return { skills: listSkills(scope), stats: brainStats(scope) }
+  })
+  handle('brain:setPinned', ({ id, pinned }) => setSkillPinned(id, pinned))
+  handle('brain:delete', ({ id }) => deleteSkill(id))
 
   // Models + engines
   handle('models:list', () => listModels(ctx.repos.settings.get()))

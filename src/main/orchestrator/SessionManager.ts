@@ -5,6 +5,8 @@ import { classifySubtask, recommendModelForSubtask, tierForKind, TASK_KINDS } fr
 import { computeBlastRadius, reviewVerdict } from '@shared/blastRadius'
 import { buildTaskBrief } from '@shared/taskBrief'
 import { recall } from '../integrations/agentMemory'
+import { learn, recallSkills } from '../integrations/brainStore'
+import { formatSkillsForBrief } from '@shared/brain'
 import { projectRoot } from '../util/projectRoot'
 import { writeWorktreeBrief } from '../util/taskBriefFile'
 import type { Repositories } from '../db/repositories'
@@ -165,6 +167,10 @@ export class SessionManager {
       const relevant = recall(root, `${title} ${req.prompt}`, 5)
       const notes = relevant.length ? relevant : recall(root, undefined, 5)
       taskBrief = buildTaskBrief({ title, issueIdentifier: req.linearIssueId ?? null, notes })
+      // Prime the agent with the brain's most relevant LEARNED SKILLS (bumps their
+      // reuse) — so it reuses past work instead of re-deriving it (fewer tokens).
+      const brainSection = formatSkillsForBrief(recallSkills(root, `${title} ${req.prompt}`, 5))
+      if (brainSection) taskBrief = `${brainSection}\n\n${taskBrief}`
       if (worktreePath) await writeWorktreeBrief(worktreePath, taskBrief)
       else systemPromptAppend = `${preset.systemPromptAppend}\n\n${taskBrief}`
     } catch {
@@ -574,10 +580,22 @@ export class SessionManager {
       if (!info || info.status !== 'completed' || info.parentId) return
       const files = await computeDiff(info.cwd)
       if (!files.length) return // nothing changed → nothing to review
-      const updated = this.repos.sessions.update(id, { reviewVerdict: reviewVerdict(computeBlastRadius(files)) })
+      const radius = computeBlastRadius(files)
+      const updated = this.repos.sessions.update(id, { reviewVerdict: reviewVerdict(radius) })
       if (updated) this.bus.emit({ channel: 'session:updated', payload: updated })
+      // Free brain skill: a "where" map of which subsystems this task touched, so
+      // future tasks in the same space recall the layout instead of re-discovering it.
+      if (radius.subsystems.length) {
+        const root = await projectRoot(info.cwd)
+        learn(root, {
+          kind: 'map',
+          title: info.title.slice(0, 80),
+          body: `Touched ${radius.subsystems.join(', ')} (${files.length} file${files.length === 1 ? '' : 's'}).`,
+          sessionId: id
+        })
+      }
     } catch {
-      // best-effort — never let verdict scoring disturb the run lifecycle
+      // best-effort — never let verdict scoring or brain writes disturb the run lifecycle
     }
   }
 
