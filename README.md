@@ -163,7 +163,7 @@ Add your own via `~/.multitasker/workflows.json` — see [Importing workflows](#
 - **GitHub PR actions** (`github.pr_create` / `github.pr_comment`) shell out to `gh` and are **gated to one-click approval by default** (suppressed under dry-run). They run scoped to the session repo; `gh` must be installed and authenticated.
 - The connector execution worker allows only MCP connector tools (never shell/fs) with name-based containment of other *named* connectors (LOW): unidentified MCP servers aren't excluded, and it isn't yet bound to the single approved *tool*. Scope it to the connector's MCP server id as a follow-up.
 - Idle-but-live sessions hold a concurrency slot until stopped (the subprocess is alive); the cap gates **resident** sessions.
-- Deferred: browser/remote mode, multi-user/RBAC, cross-session orchestration graphs, worktree auto-merge, app signing/notarization, an `xterm` terminal panel, a cost dashboard.
+- Deferred: browser/remote mode, multi-user/RBAC, cross-session orchestration graphs, worktree auto-merge, app signing/notarization, an `xterm` terminal panel.
 
 ## Layout
 
